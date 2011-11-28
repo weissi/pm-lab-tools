@@ -252,7 +252,7 @@ static void *handler_thread_main(void *opaque_info) {
         err = write(conn_fd, "DATA AVAILABLE, PRESS ENTER\n", 28);
         if(0 > err) {
             /* ERROR */
-            printf("Client %ld write failed: %s\n", pthread_self(), strerror(err));
+            printf("Client %ld write failed: %s\n", pthread_self(), strerror(errno));
             break;
         }
         assert(28 == err);
@@ -264,14 +264,14 @@ static void *handler_thread_main(void *opaque_info) {
             break;
         } else if(0 > err) {
             /* ERROR */
-            printf("Client %ld read failed: %s\n", pthread_self(), strerror(err));
+            printf("Client %ld read failed: %s\n", pthread_self(), strerror(errno));
             break;
         }
 
         err = write(conn_fd, "THANKS\n", 7);
         if(0 > err) {
             /* ERROR */
-            printf("Client %ld write failed: %s\n", pthread_self(), strerror(err));
+            printf("Client %ld write failed: %s\n", pthread_self(), strerror(errno));
             break;
         }
         assert(7 == err);
@@ -324,8 +324,12 @@ static void wait_for_connections(data_info_t *data_info) {
     servaddr.sin_port = htons(SERVER_PORT);
 
     err = bind(server_sock, (struct sockaddr *) &servaddr, sizeof(servaddr));
-    perror("bind");
-    assert(0 <= err);
+    assert(0 == err || -1 == err);
+    if(0 != err) {
+        close(server_sock);
+        printf("ERROR: bind: %s\n", strerror(errno));
+        exit(1);
+    }
 
     err = listen(server_sock, LISTEN_QUEUE_LEN);
     assert(0 <= err);
