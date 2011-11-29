@@ -46,10 +46,16 @@
 #define BUFFER_SAMPLES_PER_CHANNEL 1024
 
 
-static const double TEST_DATA[] =
+static const double TEST_ANALOG_DATA[] =
     { 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, /* channel 1 */
       0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, /* channel 2 */
       0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0  /* channel 3 */
+    };
+
+static const digival_t TEST_DIGITAL_DATA[] =
+    { 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, /* channel 1 */
+      0, 1, 0, 0, 0, 0, 1, 0, 0, 0, /* channel 2 */
+      0, 0, 1, 0, 0, 0, 1, 0, 0, 0  /* channel 3 */
     };
 
 volatile bool running = true;
@@ -69,37 +75,43 @@ static int read_dummy(void *handle, unsigned int sampling_rate, time_t timeout,
 
     assert(30 <= data_size);
     *points_per_channel = 10;
-    sleep(1);
-    memcpy(buffer, TEST_DATA, 30 * sizeof(double));
+    /* sleep(3); */
+    memcpy(buffer, TEST_ANALOG_DATA, 30 * sizeof(double));
 
     return 0;
 }
 
 static void *ni_thread_main(void *opaque_info) {
+    int err;
     input_data_t *info = (input_data_t *)opaque_info;
     unsigned int points_pc;
-    const unsigned int a_channels = 3;
-    const unsigned int d_channels = 1;
-    double analog_data[BUFFER_SAMPLES_PER_CHANNEL * a_channels];
-    bool digital_data[BUFFER_SAMPLES_PER_CHANNEL * d_channels];
+    const unsigned int num_channels = 3;
+    double analog_data[BUFFER_SAMPLES_PER_CHANNEL * num_channels];
+    digival_t digital_data[BUFFER_SAMPLES_PER_CHANNEL * num_channels];
     (void)digital_data;
 
     while(running) {
+        struct timespec time;
         wait_read_barrier();
         if(!running) {
             break;
         }
         reset_ready_handlers();
-        notify_data_unavailable();
+        /* notify_data_unavailable(); */
         read_dummy(NULL, 50000, 0, DAQmx_Val_GroupByChannel, analog_data,
                    1000, &points_pc, NULL);
+        memcpy(digital_data, TEST_DIGITAL_DATA, 30 * sizeof(digival_t));
+        err = clock_gettime(CLOCK_REALTIME, &time);
+        assert(0 == err);
         /*
         for i = 1 to n:
             check_trigger_signal(i)
             */
+        info->time = time;
         info->points_per_channel = points_pc;
+        info->num_channels = num_channels;
         info->analog_data = analog_data;
-        info->analog_channels = a_channels;
+        info->digital_data = digital_data;
         printf("NI: read successful\n");
         notify_data_available();
     }

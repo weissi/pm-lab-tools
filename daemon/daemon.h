@@ -2,24 +2,25 @@
 #define DAEMON_H
 
 #include <stdbool.h>
+#include "common.h"
 
 extern volatile bool running;
 
 typedef struct {
+    struct timespec time;
     unsigned int points_per_channel;
+    unsigned int num_channels;
 
     /* analog inputs */
     double *analog_data;
-    unsigned int analog_channels;
 
     /* digital inputs */
-    bool *digital_data;
-    unsigned int digital_channels;
+    digival_t *digital_data;
 } input_data_t;
 
 typedef struct {
     int fd;
-    input_data_t *data_info;
+    input_data_t *data_info; /* const */
 } handler_thread_info_t;
 
 #endif

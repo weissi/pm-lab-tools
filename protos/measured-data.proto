@@ -1,0 +1,21 @@
+message Timestamp {
+    required int64 sec = 1;
+    required int64 nsec = 2;
+}
+
+message MeasuredData {
+    required string shot_id = 1;
+    required double sampling_rate = 2;
+    required uint32 channel_count = 3;
+    repeated string channel_names = 4;
+}
+
+message DataSet {
+    required Timestamp time = 1;
+    repeated DataPoints channel_data = 2;
+}
+
+message DataPoints {
+    repeated double analog_data = 1 [packed=true];
+    repeated bool digital_data = 2 [packed=true];
+}

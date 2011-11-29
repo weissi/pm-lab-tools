@@ -21,7 +21,7 @@ static pthread_cond_t __cond_read = PTHREAD_COND_INITIALIZER;
 static pthread_mutex_t __mutex_data = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t __cond_data = PTHREAD_COND_INITIALIZER;
 static pthread_mutex_t __mutex_handlers = PTHREAD_MUTEX_INITIALIZER;
-static time_t __data_available = 0;
+static unsigned int __data_available = 0;
 static unsigned int __ready_handlers = 0;
 static unsigned int __available_handlers = 0;
 
@@ -96,10 +96,10 @@ void notify_data_available(void) {
     printf("DA\n");
     fflush(stdout);
     pthread_mutex_lock(&__mutex_data);
-    __data_available = time(NULL);
+    __data_available++;
     pthread_mutex_unlock(&__mutex_data);
 }
-
+/*
 void notify_data_unavailable(void) {
     int err;
     err = pthread_mutex_lock(&__mutex_data);
@@ -108,7 +108,7 @@ void notify_data_unavailable(void) {
     err = pthread_mutex_unlock(&__mutex_data);
     assert(0 == err);
 }
-
+*/
 void inc_available_handlers(void) {
     int err;
     err = pthread_mutex_lock(&__mutex_handlers);

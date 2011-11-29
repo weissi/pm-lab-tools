@@ -8,4 +8,6 @@
 
 #define WAIT_TIMEOUT ((struct timespec){1, 500L*TIME_MS})
 
+typedef int digival_t;
+
 #endif
