@@ -1,5 +1,5 @@
 /*
- *  Records data from a NI USB-6218 and send it to connected clients
+ *  Records analog data from a NI USB-6218 and send it to connected clients
  *
  *  Copyright (C)2011, Johannes Weiß <weiss@tux4u.de>
  *                   , Jonathan Dimond <jonny@dimond.de>
@@ -35,19 +35,16 @@
 
 #include <assert.h>
 
+#include "common.h"
+#include "daemon.h"
+#include "sync.h"
+#include "handler.h"
+
 #define DAQmx_Val_GroupByChannel 0
 #define SERVER_PORT 12345
 #define LISTEN_QUEUE_LEN 8
+#define BUFFER_SAMPLES_PER_CHANNEL 1024
 
-typedef struct {
-    double *data;
-    unsigned int points_per_channel;
-} data_info_t;
-
-typedef struct {
-    int fd;
-    data_info_t *data_info;
-} handler_thread_info_t;
 
 static const double TEST_DATA[] =
     { 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, /* channel 1 */
@@ -55,25 +52,14 @@ static const double TEST_DATA[] =
       0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0  /* channel 3 */
     };
 
-static const struct timespec WAIT_TIMEOUT = { 1, 500000000L };
-
-static pthread_mutex_t __mutex_read = PTHREAD_MUTEX_INITIALIZER;
-static pthread_cond_t __cond_read = PTHREAD_COND_INITIALIZER;
-static pthread_mutex_t __mutex_data = PTHREAD_MUTEX_INITIALIZER;
-static pthread_cond_t __cond_data = PTHREAD_COND_INITIALIZER;
-static pthread_mutex_t __mutex_handlers = PTHREAD_MUTEX_INITIALIZER;
-static time_t __data_available = 0;
-static unsigned int __ready_handlers = 0;
-static volatile unsigned int __available_handlers = 0;
-
-static volatile bool running = true;
+volatile bool running = true;
 static void sig_hnd() {
     printf("Ctrl+C caught, exiting...\n");
     running = false;
 }
 
 static int read_dummy(void *handle, unsigned int sampling_rate, time_t timeout,
-                      int format, double *data, size_t data_size,
+                      int format, double *buffer, size_t data_size,
                       unsigned int *points_per_channel, void *unused) {
     (void)handle;
     (void)sampling_rate;
@@ -84,210 +70,43 @@ static int read_dummy(void *handle, unsigned int sampling_rate, time_t timeout,
     assert(30 <= data_size);
     *points_per_channel = 10;
     sleep(1);
-    memcpy(data, TEST_DATA, 30 * sizeof(double));
+    memcpy(buffer, TEST_DATA, 30 * sizeof(double));
 
     return 0;
 }
 
-static unsigned int get_available_handlers(void) {
-    int err;
-    unsigned int handlers;
-
-    err = pthread_mutex_lock(&__mutex_handlers);
-    assert(0 == err);
-
-    handlers = __available_handlers;
-
-    err = pthread_mutex_unlock(&__mutex_handlers);
-    assert(0 == err);
-
-    return handlers;
-}
-
-static void get_abs_wait_timeout(struct timespec *abs_timeout) {
-    struct timespec wait_timeout = WAIT_TIMEOUT;
-    int err = clock_gettime(CLOCK_REALTIME, abs_timeout);
-    assert(0 == err);
-    if(abs_timeout->tv_nsec >= 500000000L) {
-        /* take care tv_nsec does not get greater or equal one second */
-        abs_timeout->tv_sec++;
-        wait_timeout.tv_nsec -= 500000000L;
-    }
-    abs_timeout->tv_sec += wait_timeout.tv_sec;
-    abs_timeout->tv_nsec += wait_timeout.tv_nsec;
-}
-
-#define START_TIMING(t) (t) = time(NULL)
-#define STOP_TIMING(t) (t) = (time(NULL) - (t))
-#define PRINT_TIMING(t,n) printf("[%ld] "n": %lds\n", pthread_self(), (long int)(t))
-
-static void wait_read_barrier(void) {
-    int err;
-    time_t timer;
-    struct timespec abs_timeout;
-
-    START_TIMING(timer);
-    err = pthread_mutex_lock(&__mutex_read);
-    assert(0 == err);
-    while(running && __ready_handlers < get_available_handlers()) {
-        get_abs_wait_timeout(&abs_timeout);
-        err = pthread_cond_timedwait(&__cond_read, &__mutex_read, &abs_timeout);
-        assert(0 == err || ETIMEDOUT == err);
-        printf("pthread_cond_timedwait: %s (av handlers: %u, rd handlers: %u)\n",
-               strerror(err),
-               __available_handlers,
-               __ready_handlers);
-    }
-    err = pthread_mutex_unlock(&__mutex_read);
-    assert(0 == err);
-    STOP_TIMING(timer);
-    PRINT_TIMING(timer, "wait_read_barrier");
-}
-
-static void notify_read_barrier(void) {
-    int err = pthread_mutex_lock(&__mutex_read);
-    assert(0 == err);
-    __ready_handlers++;
-    pthread_cond_broadcast(&__cond_read);
-    err = pthread_mutex_unlock(&__mutex_read);
-    assert(0 == err);
-    printf("NOTIFIED READ BARRIER\n");
-}
-
-static time_t wait_data_available(time_t last_data) {
-    int err;
-    struct timespec timeout = WAIT_TIMEOUT;
-    time_t timer, data_at = 0;
-    START_TIMING(timer);
-    err = pthread_mutex_lock(&__mutex_data);
-    assert(0 == err);
-    while(running && last_data >= __data_available) {
-        err = pthread_cond_timedwait(&__cond_data, &__mutex_data, &timeout);
-        assert(0 == err || ETIMEDOUT == err);
-    }
-    data_at = __data_available;
-    err = pthread_mutex_unlock(&__mutex_data);
-    assert(0 == err);
-    STOP_TIMING(timer);
-    PRINT_TIMING(timer, "wait_data_available");
-    return data_at;
-}
-
-static void notify_data_available(void) {
-    printf("DA\n");
-    fflush(stdout);
-    pthread_mutex_lock(&__mutex_data);
-    __data_available = time(NULL);
-    pthread_mutex_unlock(&__mutex_data);
-}
-
-static void notify_data_unavailable(void) {
-    int err;
-    err = pthread_mutex_lock(&__mutex_data);
-    assert(0 == err);
-    __data_available = 0;
-    err = pthread_mutex_unlock(&__mutex_data);
-    assert(0 == err);
-}
-
-static void inc_available_handlers(void) {
-    int err;
-    err = pthread_mutex_lock(&__mutex_handlers);
-    assert(0 == err);
-    __available_handlers++;
-    err = pthread_mutex_unlock(&__mutex_handlers);
-    assert(0 == err);
-    notify_read_barrier();
-}
-
-static void dec_available_handlers(void) {
-    int err;
-    err = pthread_mutex_lock(&__mutex_handlers);
-    assert(0 == err);
-    __available_handlers--;
-    err = pthread_mutex_unlock(&__mutex_handlers);
-    assert(0 == err);
-    notify_read_barrier();
-}
-
 static void *ni_thread_main(void *opaque_info) {
-    data_info_t *info = (data_info_t *)opaque_info;
-    double data[1000];
+    input_data_t *info = (input_data_t *)opaque_info;
     unsigned int points_pc;
+    const unsigned int a_channels = 3;
+    const unsigned int d_channels = 1;
+    double analog_data[BUFFER_SAMPLES_PER_CHANNEL * a_channels];
+    bool digital_data[BUFFER_SAMPLES_PER_CHANNEL * d_channels];
+    (void)digital_data;
 
     while(running) {
         wait_read_barrier();
         if(!running) {
             break;
         }
-        __ready_handlers = 0;
+        reset_ready_handlers();
         notify_data_unavailable();
-        read_dummy(NULL, 50000, 0, DAQmx_Val_GroupByChannel, data, 1000, &points_pc, NULL);
+        read_dummy(NULL, 50000, 0, DAQmx_Val_GroupByChannel, analog_data,
+                   1000, &points_pc, NULL);
+        /*
+        for i = 1 to n:
+            check_trigger_signal(i)
+            */
         info->points_per_channel = points_pc;
-        info->data = data;
+        info->analog_data = analog_data;
+        info->analog_channels = a_channels;
         printf("NI: read successful\n");
         notify_data_available();
     }
     return NULL;
 }
 
-static void *handler_thread_main(void *opaque_info) {
-    char buf[1024];
-    handler_thread_info_t *info = (handler_thread_info_t *)opaque_info;
-    int conn_fd = info->fd;
-    int err;
-    time_t last_data = 0;
-
-    printf("Handler thread accepted %d\n", conn_fd);
-    inc_available_handlers();
-    err = write(conn_fd, "WELCOME ABOARD\n", 15);
-    assert(15 == err);
-
-    while(running) {
-        last_data = wait_data_available(last_data);
-        if(!running) {
-            break;
-        }
-        printf("Client %ld received data %ld\n", pthread_self(), (long int)last_data);
-        err = write(conn_fd, "DATA AVAILABLE, PRESS ENTER\n", 28);
-        if(0 > err) {
-            /* ERROR */
-            printf("Client %ld write failed: %s\n", pthread_self(), strerror(errno));
-            break;
-        }
-        assert(28 == err);
-
-        err = read(conn_fd, buf, 1);
-        if(0 == err) {
-            /* EOF */
-            printf("Client %ld left, EOF\n", pthread_self());
-            break;
-        } else if(0 > err) {
-            /* ERROR */
-            printf("Client %ld read failed: %s\n", pthread_self(), strerror(errno));
-            break;
-        }
-
-        err = write(conn_fd, "THANKS\n", 7);
-        if(0 > err) {
-            /* ERROR */
-            printf("Client %ld write failed: %s\n", pthread_self(), strerror(errno));
-            break;
-        }
-        assert(7 == err);
-
-        notify_read_barrier();
-    }
-
-    dec_available_handlers();
-
-    err = close(conn_fd);
-    assert(0 == err);
-    free(opaque_info);
-    return NULL;
-}
-
-static void launch_handler_thread(data_info_t *data_info, int conn_fd) {
+static void launch_handler_thread(input_data_t *data_info, int conn_fd) {
     pthread_t handler_thread;
     int err;
     handler_thread_info_t *handler_info =
@@ -305,7 +124,7 @@ static void launch_handler_thread(data_info_t *data_info, int conn_fd) {
     assert(0 == err);
 }
 
-static void wait_for_connections(data_info_t *data_info) {
+static void wait_for_connections(input_data_t *data_info) {
     struct sockaddr_in servaddr;
     int err;
     int conn;
@@ -356,7 +175,7 @@ static void wait_for_connections(data_info_t *data_info) {
 }
 
 int main(int argc, char **argv) {
-    data_info_t data_info;
+    input_data_t data_info;
     pthread_t acquire_data_thread;
 
     int err;
