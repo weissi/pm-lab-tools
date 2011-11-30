@@ -5,6 +5,9 @@ set -e
 HERE=$(cd $(dirname ${BASH_SOURCE[0]}) > /dev/null && pwd)
 cd "$HERE"
 
+CFLAGS="$CFLAGS -ggdb"
+LDLAGS="$LDLAGS -ggdb"
+
 function compile_c() {
     echo "- Compiling $1.c"
     gcc -std=gnu99 -Wall -Werror -pedantic -lrt -lpthread -c $CFLAGS \
