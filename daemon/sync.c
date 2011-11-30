@@ -25,7 +25,7 @@ static unsigned int __data_available = 0;
 static unsigned int __ready_handlers = 0;
 static unsigned int __available_handlers = 0;
 
-static void get_abs_wait_timeout(struct timespec *abs_timeout) {
+void abs_wait_timeout(struct timespec *abs_timeout) {
     struct timespec wait_timeout = WAIT_TIMEOUT;
     int err = clock_gettime(CLOCK_REALTIME, abs_timeout);
     assert(0 == err);
@@ -49,7 +49,7 @@ void wait_read_barrier(void) {
     err = pthread_mutex_lock(&__mutex_read);
     assert(0 == err);
     while(running && __ready_handlers < get_available_handlers()) {
-        get_abs_wait_timeout(&abs_timeout);
+        abs_wait_timeout(&abs_timeout);
         err = pthread_cond_timedwait(&__cond_read, &__mutex_read, &abs_timeout);
         assert(0 == err || ETIMEDOUT == err);
         printf("pthread_cond_timedwait: %s (av handlers: %u, rd handlers: %u)\n",

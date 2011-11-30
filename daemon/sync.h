@@ -3,6 +3,8 @@
 
 #include <time.h>
 
+void abs_wait_timeout(struct timespec *abs_timeout);
+
 void wait_read_barrier(void);
 void notify_read_barrier(void);
 void notify_data_available(void);

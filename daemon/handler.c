@@ -14,6 +14,7 @@
 #include "measured-data.pb-c.h"
 
 #define MAGIC_DATA_SET "THE MATRIX HAS YOU!!"
+#define BUF_SIZE 128
 
 static void timestamp_from_timespec(Timestamp *dest, struct timespec *src) {
     timestamp__init(dest);
@@ -31,6 +32,17 @@ static void timespec_from_timestamp(struct timespec *dest, Timestamp *src) {
 }
 */
 
+typedef struct {
+    pthread_mutex_t lock;
+    input_data_t *buffer;
+    const size_t max_elems;
+    input_data_t *start;
+    size_t count;
+} buffer_desc_t;
+
+/*
+ * PROTOCOL BUFFER ENCODING AND SENDING
+ */
 static void encode_datapoints(unsigned int len,
                               double *analog_data,
                               digival_t *digital_data,
@@ -44,7 +56,6 @@ static void encode_datapoints(unsigned int len,
     msg_dps->digital_data = (protobuf_c_boolean *)digital_data;
 }
 
-
 static int write_dataset(int fd,
                          unsigned int num_channels,  /* 3 */
                          unsigned int channel_ids[], /* 1, 4, 16 */
@@ -54,7 +65,7 @@ static int write_dataset(int fd,
                                                       * chan2val1, chan2val2,
                                                       * ... */
                          digival_t *digital_data) {  /* just as analog_data */
-    int err;
+    int err, ret;
     DataSet msg_ds = DATA_SET__INIT;
     Timestamp msg_time;
     DataPoints **msg_dps = alloca(sizeof(DataPoints *) * num_channels);
@@ -70,7 +81,10 @@ static int write_dataset(int fd,
 
     for (int i=0; i<num_channels; i++) {
         const unsigned int offset = channel_ids[i] * len;
-        encode_datapoints(len, analog_data+offset, digital_data+offset, msg_dps[i]);
+        encode_datapoints(len,
+                          analog_data+offset,
+                          digital_data+offset,
+                          msg_dps[i]);
     }
 
     msg_ds.n_channel_data = num_channels;
@@ -82,12 +96,14 @@ static int write_dataset(int fd,
 
     data_set__pack(&msg_ds, buf);
 
+    ret = 0;
     err = write(fd, MAGIC_DATA_SET, sizeof(MAGIC_DATA_SET));
     if (err < 0) {
         goto finally;
     } else {
         assert(sizeof(MAGIC_DATA_SET) == err);
     }
+    ret += err;
 
     err = write(fd, &msg_len, sizeof(uint32_t));
     if (err < 0) {
@@ -95,6 +111,7 @@ static int write_dataset(int fd,
     } else {
         assert(sizeof(uint32_t) == err);
     }
+    ret += err;
 
     err = write(fd, buf, msg_len);
     if (err < 0) {
@@ -102,14 +119,133 @@ static int write_dataset(int fd,
     } else {
         assert(msg_len == err);
     }
-
-    err = 0;
+    ret += err;
+    err = ret;
 
 finally:
     free(buf);
     return err;
 }
 
+/*
+ * BUFFER MANAGEMENT
+ */
+static int copy_to_buffer(buffer_desc_t *buf,
+                          input_data_t *in) {
+    int ret, err;
+
+    err = pthread_mutex_lock(&buf->lock);
+    assert(0 == err);
+
+    while(true) {
+        assert(buf->count <= buf->max_elems);
+        assert(buf->start <= buf->buffer+buf->max_elems);
+
+        if(buf->start+buf->count+1 < buf->buffer+buf->max_elems) {
+            /* new element will fit in the buffer */
+            unsigned int samples = in->num_channels * in->points_per_channel;
+            input_data_t *dest = buf->start + buf->count;
+
+            *dest = *in;
+
+            /* copy analog data */
+            dest->analog_data = malloc(samples * sizeof(double));
+            assert(NULL != dest->analog_data);
+            memcpy(dest->analog_data,
+                   in->analog_data,
+                   samples * sizeof(double));
+
+            /* copy digital data */
+            dest->digital_data = malloc(samples * sizeof(digival_t));
+            assert(NULL != dest->digital_data);
+            memcpy(dest->digital_data,
+                   in->digital_data,
+                   samples * sizeof(digival_t));
+
+            buf->count++;
+
+            ret = 0;
+            break; /* success */
+        } else if(buf->start != buf->buffer) {
+            /* move to front and try again */
+            printf("MOVE TO FRONT!\n");
+            buf->start = memmove(buf->buffer,
+                                 buf->start,
+                                 sizeof(input_data_t) * buf->count);
+            continue; /* try again */
+        } else {
+            /* no buffer space left :-( */
+            ret = ENOBUFS;
+            break;
+        }
+        break;
+    }
+
+    err = pthread_mutex_unlock(&buf->lock);
+    assert(0 == err);
+
+    return ret;
+}
+
+static int write_buf_element(int fd,
+                             buffer_desc_t *buf,
+                             unsigned int channel_ids[],
+                             unsigned int channel_count) {
+    int err, ret;
+    input_data_t *in;
+
+    err = pthread_mutex_lock(&buf->lock);
+    assert(0 == err);
+
+    if(buf->count > 0) {
+        in = (input_data_t *)buf->start;
+        buf->count--;
+        buf->start++;
+
+        ret = -1;
+    } else {
+        ret = 0;
+    }
+
+    err = pthread_mutex_unlock(&buf->lock);
+    assert(0 == err);
+
+    if(0 != ret) {
+        ret = write_dataset(fd,
+                            channel_count,
+                            channel_ids,
+                            in->points_per_channel,
+                            in->time,
+                            in->analog_data,
+                            in->digital_data);
+        free(in->analog_data);
+        free(in->digital_data);
+    }
+
+    return ret;
+}
+
+void free_buffer(buffer_desc_t *buf) {
+    int err;
+
+    err = pthread_mutex_lock(&buf->lock);
+    assert(0 == err);
+
+    for(size_t i=0; i<buf->count; i++) {
+        input_data_t *in = buf->start + i;
+        free(in->analog_data);
+        free(in->digital_data);
+    }
+    free(buf->buffer);
+    buf->buffer = NULL;
+
+    err = pthread_mutex_unlock(&buf->lock);
+    assert(0 == err);
+}
+
+/*
+ * FUNCTIONALITY
+ */
 void *handler_thread_main(void *opaque_info) {
     unsigned int my_channels[] = { 0, 1, 2 };
     unsigned int my_num_channels = 3;
@@ -117,6 +253,14 @@ void *handler_thread_main(void *opaque_info) {
     int conn_fd = info->fd;
     int err;
     time_t last_data = 0;
+    buffer_desc_t buffer_desc = { .buffer = malloc(BUF_SIZE * sizeof(input_data_t))
+                                , .lock = PTHREAD_MUTEX_INITIALIZER
+                                , .count = 0
+                                , .max_elems = BUF_SIZE
+                                , .start = 0
+                                };
+    assert(NULL != buffer_desc.buffer);
+    buffer_desc.start = buffer_desc.buffer;
 
     printf("Handler thread accepted %d\n", conn_fd);
     inc_available_handlers();
@@ -130,20 +274,41 @@ void *handler_thread_main(void *opaque_info) {
         }
 
         input_data_t *data_info = info->data_info;
-        err = write_dataset(conn_fd, my_num_channels, my_channels,
-                            data_info->points_per_channel, data_info->time,
-                            data_info->analog_data, data_info->digital_data);
+        err = copy_to_buffer(&buffer_desc, data_info);
+        if(ENOBUFS == err) {
+            /* out of buffer space */
+            break;
+        }
+        assert(0 == err);
+        printf("Buffer %p has now %u/%u element(s) starting at %p (offset = %u)\n",
+               (void *)buffer_desc.buffer,
+               buffer_desc.count,
+               buffer_desc.max_elems,
+               (void *)buffer_desc.start,
+               (buffer_desc.start-buffer_desc.buffer));
+        if(0) {
+        err = write_buf_element(conn_fd,
+                                &buffer_desc,
+                                my_channels,
+                                my_num_channels);
+        printf("err = %d\n", err);
+        perror("write_buf");
+        assert(0 < err);
+
         if(0 > err) {
             /* ERROR */
             printf("Client %ld write failed: %s\n", pthread_self(), strerror(errno));
             break;
         }
-        assert(0 == err);
+        assert(0 < err);
+        }
 
         notify_read_barrier();
     }
 
     dec_available_handlers();
+
+    free_buffer(&buffer_desc);
 
     err = close(conn_fd);
     assert(0 == err);
