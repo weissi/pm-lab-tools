@@ -21,8 +21,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <pthread.h>
 #include <string.h>
+#include <pthread.h>
 #include <unistd.h>
 #include <stdbool.h>
 #include <arpa/inet.h>
@@ -44,6 +44,7 @@
 #define SERVER_PORT 12345
 #define LISTEN_QUEUE_LEN 8
 #define BUFFER_SAMPLES_PER_CHANNEL 1024
+#define SAMPLING_RATE 50000
 
 
 static const double TEST_ANALOG_DATA[] =
@@ -81,6 +82,7 @@ static double timediff(struct timespec *start, struct timespec *end) {
            */
     return d;
 }
+
 static int read_dummy(void *handle, unsigned int sampling_rate, time_t timeout,
                       int format, double *buffer, size_t data_size,
                       unsigned int *points_per_channel, void *unused) {
@@ -100,7 +102,7 @@ static int read_dummy(void *handle, unsigned int sampling_rate, time_t timeout,
 
     clock_gettime(CLOCK_REALTIME, &current);
     if(last.tv_sec != 0) {
-        assert(0.5 > timediff(&last, &current));
+        assert(0.1 > timediff(&last, &current));
         last = current;
     }
     usleep(100);
@@ -109,37 +111,35 @@ static int read_dummy(void *handle, unsigned int sampling_rate, time_t timeout,
 }
 
 static void *ni_thread_main(void *opaque_info) {
-    int err;
     input_data_t *info = (input_data_t *)opaque_info;
     unsigned int points_pc;
     const unsigned int num_channels = 3;
     double analog_data[BUFFER_SAMPLES_PER_CHANNEL * num_channels];
     digival_t digital_data[BUFFER_SAMPLES_PER_CHANNEL * num_channels];
     (void)digital_data;
+    uint64_t timestamp = 0;
 
     while(running) {
-        struct timespec time;
         wait_read_barrier();
         if(!running) {
             break;
         }
         reset_ready_handlers();
         /* notify_data_unavailable(); */
-        read_dummy(NULL, 50000, 0, DAQmx_Val_GroupByChannel, analog_data,
+        read_dummy(NULL, SAMPLING_RATE, 0, DAQmx_Val_GroupByChannel, analog_data,
                    1000, &points_pc, NULL);
         memcpy(digital_data, TEST_DIGITAL_DATA, 30 * sizeof(digival_t));
-        err = clock_gettime(CLOCK_REALTIME, &time);
-        assert(0 == err);
         /*
         for i = 1 to n:
             check_trigger_signal(i)
             */
-        info->time = time;
+        info->timestamp_nanos = timestamp;
         info->points_per_channel = points_pc;
         info->num_channels = num_channels;
         info->analog_data = analog_data;
         info->digital_data = digital_data;
         printf("NI: read successful\n");
+        timestamp += TIME_S * points_pc / SAMPLING_RATE;
         notify_data_available();
     }
     return NULL;

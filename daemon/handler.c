@@ -17,22 +17,6 @@
 #define MAGIC_DATA_SET "THE MATRIX HAS YOU!!"
 #define BUF_SIZE 256
 
-static void timestamp_from_timespec(Timestamp *dest, struct timespec *src) {
-    timestamp__init(dest);
-    if (NULL != src) {
-        dest->sec = src->tv_sec;
-        dest->nsec = src->tv_nsec;
-    }
-}
-/*
-static void timespec_from_timestamp(struct timespec *dest, Timestamp *src) {
-    if (NULL != src) {
-        dest->tv_sec = src->sec;
-        dest->tv_nsec = src->nsec;
-    }
-}
-*/
-
 typedef struct {
     pthread_mutex_t lock;
     input_data_t *buffer;
@@ -69,14 +53,13 @@ static int write_dataset(int fd,
                          unsigned int num_channels,  /* 3 */
                          unsigned int channel_ids[], /* 1, 4, 16 */
                          unsigned int len,           /* samples per channel */
-                         struct timespec time,
+                         uint64_t timestamp,
                          double *analog_data,        /* chan1val1, chan1val2,
                                                       * chan2val1, chan2val2,
                                                       * ... */
                          digival_t *digital_data) {  /* just as analog_data */
     int err, ret;
     DataSet msg_ds = DATA_SET__INIT;
-    Timestamp msg_time;
     DataPoints **msg_dps = alloca(sizeof(DataPoints *) * num_channels);
     assert(NULL != msg_dps);
 
@@ -85,8 +68,7 @@ static int write_dataset(int fd,
         assert(NULL != msg_dps[i]);
     }
 
-    msg_ds.time = &msg_time;
-    timestamp_from_timespec(msg_ds.time, &time);
+    msg_ds.timestamp_nanos = timestamp;
 
     for (int i=0; i<num_channels; i++) {
         const unsigned int offset = channel_ids[i] * len;
@@ -224,7 +206,7 @@ static int write_buf_element(int fd,
                             channel_count,
                             channel_ids,
                             in.points_per_channel,
-                            in.time,
+                            in.timestamp_nanos,
                             in.analog_data,
                             in.digital_data);
         free(in.analog_data);

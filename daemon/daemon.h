@@ -2,12 +2,13 @@
 #define DAEMON_H
 
 #include <stdbool.h>
+#include <stdint.h>
 #include "common.h"
 
 extern volatile bool running;
 
 typedef struct {
-    struct timespec time;
+    uint64_t timestamp_nanos;
     unsigned int points_per_channel;
     unsigned int num_channels;
 
