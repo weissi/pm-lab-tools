@@ -64,9 +64,28 @@ static void sig_hnd() {
     running = false;
 }
 
+static double timediff(struct timespec *start, struct timespec *end) {
+    double d;
+    struct timespec temp;
+    if ((end->tv_nsec-start->tv_nsec)<0) {
+        temp.tv_sec = end->tv_sec-start->tv_sec-1;
+        temp.tv_nsec = 1000000000+end->tv_nsec-start->tv_nsec;
+    } else {
+        temp.tv_sec = end->tv_sec-start->tv_sec;
+        temp.tv_nsec = end->tv_nsec-start->tv_nsec;
+    }
+    d = temp.tv_sec + (temp.tv_nsec / 1000000000.0);
+    /*
+    printf("%ld.%ld - %ld.%ld = %ld.%ld = %f = %e\n", end.tv_sec, end.tv_nsec,
+           start.tv_sec, start.tv_nsec, temp.tv_sec, temp.tv_nsec, d, d);
+           */
+    return d;
+}
 static int read_dummy(void *handle, unsigned int sampling_rate, time_t timeout,
                       int format, double *buffer, size_t data_size,
                       unsigned int *points_per_channel, void *unused) {
+    static struct timespec last = { 0, 0};
+    struct timespec current;
     (void)handle;
     (void)sampling_rate;
     (void)timeout;
@@ -77,6 +96,14 @@ static int read_dummy(void *handle, unsigned int sampling_rate, time_t timeout,
     *points_per_channel = 10;
     /* sleep(3); */
     memcpy(buffer, TEST_ANALOG_DATA, 30 * sizeof(double));
+    /* usleep(200000); */
+
+    clock_gettime(CLOCK_REALTIME, &current);
+    if(last.tv_sec != 0) {
+        assert(0.5 > timediff(&last, &current));
+        last = current;
+    }
+    usleep(100);
 
     return 0;
 }

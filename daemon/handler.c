@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -14,7 +15,7 @@
 #include "measured-data.pb-c.h"
 
 #define MAGIC_DATA_SET "THE MATRIX HAS YOU!!"
-#define BUF_SIZE 128
+#define BUF_SIZE 256
 
 static void timestamp_from_timespec(Timestamp *dest, struct timespec *src) {
     timestamp__init(dest);
@@ -39,6 +40,14 @@ typedef struct {
     input_data_t *start;
     size_t count;
 } buffer_desc_t;
+
+typedef struct {
+    buffer_desc_t *buffer_desc;
+    volatile bool *handler_running;
+    int conn_fd;
+    unsigned int num_channels;
+    unsigned int *channels;
+} sender_thread_info_t;
 
 /*
  * PROTOCOL BUFFER ENCODING AND SENDING
@@ -192,13 +201,13 @@ static int write_buf_element(int fd,
                              unsigned int channel_ids[],
                              unsigned int channel_count) {
     int err, ret;
-    input_data_t *in;
+    input_data_t in;
 
     err = pthread_mutex_lock(&buf->lock);
     assert(0 == err);
 
     if(buf->count > 0) {
-        in = (input_data_t *)buf->start;
+        in = *((input_data_t *)buf->start);
         buf->count--;
         buf->start++;
 
@@ -214,12 +223,12 @@ static int write_buf_element(int fd,
         ret = write_dataset(fd,
                             channel_count,
                             channel_ids,
-                            in->points_per_channel,
-                            in->time,
-                            in->analog_data,
-                            in->digital_data);
-        free(in->analog_data);
-        free(in->digital_data);
+                            in.points_per_channel,
+                            in.time,
+                            in.analog_data,
+                            in.digital_data);
+        free(in.analog_data);
+        free(in.digital_data);
     }
 
     return ret;
@@ -246,25 +255,62 @@ void free_buffer(buffer_desc_t *buf) {
 /*
  * FUNCTIONALITY
  */
+void *handler_sender_main(void *opaque_sender_info) {
+    int err;
+    sender_thread_info_t *sender_info =
+        (sender_thread_info_t *)opaque_sender_info;
+    buffer_desc_t *buffer_desc = sender_info->buffer_desc;
+
+    while(*sender_info->handler_running) {
+        err = write_buf_element(sender_info->conn_fd,
+                                buffer_desc,
+                                sender_info->channels,
+                                sender_info->num_channels);
+        if(0 == err) {
+            /* buffer empty */
+            err = pthread_yield();
+            assert(0 == err);
+        } else if(0 > err) {
+            /* ERROR */
+            printf("Client %ld write failed: %s\n", pthread_self(), strerror(errno));
+            break;
+        } else {
+            assert(0 < err);
+        }
+    }
+
+    return NULL;
+}
+
 void *handler_thread_main(void *opaque_info) {
     unsigned int my_channels[] = { 0, 1, 2 };
     unsigned int my_num_channels = 3;
     handler_thread_info_t *info = (handler_thread_info_t *)opaque_info;
-    int conn_fd = info->fd;
     int err;
     time_t last_data = 0;
+    pthread_t sender_thread;
+    volatile bool handler_running = true;
     buffer_desc_t buffer_desc = { .buffer = malloc(BUF_SIZE * sizeof(input_data_t))
                                 , .lock = PTHREAD_MUTEX_INITIALIZER
                                 , .count = 0
                                 , .max_elems = BUF_SIZE
                                 , .start = 0
                                 };
+    sender_thread_info_t sender_info = { .buffer_desc = &buffer_desc
+                                       , .handler_running = &handler_running
+                                       , .conn_fd = info->fd
+                                       , .num_channels = my_num_channels
+                                       , .channels = my_channels
+                                       };
     assert(NULL != buffer_desc.buffer);
     buffer_desc.start = buffer_desc.buffer;
 
-    printf("Handler thread accepted %d\n", conn_fd);
+    err = pthread_create(&sender_thread, NULL, handler_sender_main, &sender_info);
+    assert(0 == err);
+
+    printf("Handler thread accepted %d\n", info->fd);
     inc_available_handlers();
-    err = write(conn_fd, "WELCOME ABOARD\n", 15);
+    err = write(info->fd, "WELCOME ABOARD\n", 15);
     assert(15 == err);
 
     while(running) {
@@ -286,32 +332,24 @@ void *handler_thread_main(void *opaque_info) {
                buffer_desc.max_elems,
                (void *)buffer_desc.start,
                (buffer_desc.start-buffer_desc.buffer));
-        if(0) {
-        err = write_buf_element(conn_fd,
-                                &buffer_desc,
-                                my_channels,
-                                my_num_channels);
-        printf("err = %d\n", err);
-        perror("write_buf");
-        assert(0 < err);
+        notify_read_barrier();
 
-        if(0 > err) {
-            /* ERROR */
-            printf("Client %ld write failed: %s\n", pthread_self(), strerror(errno));
+        err = pthread_tryjoin_np(sender_thread, NULL);
+        if(EBUSY != err) {
             break;
         }
-        assert(0 < err);
-        }
-
-        notify_read_barrier();
     }
-
     dec_available_handlers();
+    handler_running = false;
+    err = close(info->fd);
+    assert(0 == err);
 
+    err = pthread_join(sender_thread, NULL);
+    if(EINVAL != err) {
+        assert(0 == err);
+    }
     free_buffer(&buffer_desc);
 
-    err = close(conn_fd);
-    assert(0 == err);
     free(opaque_info);
     return NULL;
 }
