@@ -3,6 +3,11 @@
 
 #include <time.h>
 
+#define TIME_MS (1000000L)
+#define TIME_S (1000*(TIME_MS))
+
+#define WAIT_TIMEOUT ((struct timespec){1, 500L*TIME_MS})
+
 void abs_wait_timeout(struct timespec *abs_timeout);
 
 void wait_read_barrier(void);

@@ -1,24 +1,31 @@
 #ifndef PMLABCLIENT
 #define PMLABCLIENT
 
+#include <time.h>
+
+#include "common.h"
+
 void *pmlc_connect(char *server,
-                   unsigned int port,
+                   unsigned short port,
                    unsigned int *channels,
                    unsigned int num_channels);
+
 int pmlc_read(void *handle,
               size_t buffer_sizes,
               double *analog_data,
               digival_t *digital_data,
               unsigned int *samples_read,
-              struct timespec *);
+              uint64_t *timestamp_nanos);
+
 void pmlc_close(void *handle);
 
+/*
 void pmlc_highlevel_read(void *handler,
                          size_t buffer_size,
                          double *analog_data,
                          unsigned int data_channel,
                          unsigned int trigger_channel,
-                         trigger_type ttype, /* embedded(+threshold), digital extern, separate channel(+threshold) */
+                         trigger_type ttype, // embedded(+threshold), digital extern, separate channel(+threshold)
                          bool below,
                          double threshold);
 
@@ -44,4 +51,6 @@ while(true) {
         }
     }
 }
+*/
+
 #endif

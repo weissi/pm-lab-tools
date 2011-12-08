@@ -14,7 +14,6 @@
 
 #include "measured-data.pb-c.h"
 
-#define MAGIC_DATA_SET "THE MATRIX HAS YOU!!"
 #define BUF_SIZE 256
 
 typedef struct {
@@ -292,8 +291,8 @@ void *handler_thread_main(void *opaque_info) {
 
     printf("Handler thread accepted %d\n", info->fd);
     inc_available_handlers();
-    err = write(info->fd, "WELCOME ABOARD\n", 15);
-    assert(15 == err);
+    err = write(info->fd, WELCOME_MSG, sizeof(WELCOME_MSG));
+    assert(sizeof(WELCOME_MSG) == err);
 
     while(running) {
         last_data = wait_data_available(last_data);
@@ -308,7 +307,7 @@ void *handler_thread_main(void *opaque_info) {
             break;
         }
         assert(0 == err);
-        printf("Buffer %p has now %u/%u element(s) starting at %p (offset = %u)\n",
+        printf("Buffer %p has now %zu/%zu element(s) starting at %p (offset = %zu)\n",
                (void *)buffer_desc.buffer,
                buffer_desc.count,
                buffer_desc.max_elems,

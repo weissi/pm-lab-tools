@@ -11,8 +11,11 @@ LDLAGS="$LDLAGS -ggdb"
 function compile_c() {
     echo "- Compiling $1.c"
     gcc -std=gnu99 -Wall -Werror -pedantic -lrt -lpthread -c $CFLAGS \
-        -Idaemon -Igensrc -o "build/$(basename $1).o" $1.c
+        -Idaemon -Icommon -Igensrc -o "build/$(basename $1).o" $1.c
 }
+
+echo "Building Deamon"
+
 
 echo "- Generating protos"
 cd protos &> /dev/null
@@ -27,4 +30,19 @@ compile_c daemon/sync
 for f in gensrc/*.c; do
     compile_c ${f%*.c}
 done
+echo "- Linking deamon"
 gcc $LDFLAGS -lprotobuf-c -lrt -lpthread -o build/daemon build/*.o
+
+rm build/*.o
+
+echo
+echo "Building Client"
+
+compile_c client/pmlabclient
+for f in gensrc/*.c; do
+    compile_c ${f%*.c}
+done
+echo "- Linking pmlabclient"
+gcc $LDFLAGS -lprotobuf-c -o build/pmlabclient build/*.o
+
+rm build/*.o
