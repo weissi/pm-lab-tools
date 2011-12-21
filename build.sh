@@ -5,8 +5,13 @@ set -e
 HERE=$(cd $(dirname ${BASH_SOURCE[0]}) > /dev/null && pwd)
 cd "$HERE"
 
-CFLAGS="$CFLAGS -ggdb"
-LDLAGS="$LDLAGS -ggdb"
+rm build/* &> /dev/null || true
+
+NI_CFLAGS="-DWITH_NI"
+NI_LDFLAGS="-lnidaqmxbase"
+
+CFLAGS="$CFLAGS $NI_CFLAGS -I$HERE -ggdb"
+LDFLAGS="$LDFLAGS -ggdb"
 
 function compile_c() {
     echo "- Compiling $1.c"
@@ -24,17 +29,6 @@ for f in *.proto; do
 done
 cd ..
 
-compile_c daemon/daemon
-compile_c daemon/handler
-compile_c daemon/sync
-for f in gensrc/*.c; do
-    compile_c ${f%*.c}
-done
-echo "- Linking deamon"
-gcc $LDFLAGS -lprotobuf-c -lrt -lpthread -o build/daemon build/*.o
-
-rm build/*.o
-
 echo
 echo "Building Client"
 
@@ -45,4 +39,11 @@ done
 echo "- Linking pmlabclient"
 gcc $LDFLAGS -lprotobuf-c -o build/pmlabclient build/*.o
 
-rm build/*.o
+compile_c daemon/daemon
+compile_c daemon/handler
+compile_c daemon/sync
+for f in gensrc/*.c; do
+    compile_c ${f%*.c}
+done
+echo "- Linking deamon"
+gcc $LDFLAGS $NI_LDFLAGS -lprotobuf-c -lrt -lpthread -o build/daemon build/*.o

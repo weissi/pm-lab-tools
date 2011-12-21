@@ -1,7 +1,7 @@
 /*
  *  Records analog data from a NI USB-6218 and send it to connected clients
  *
- *  Copyright (C)2011, Johannes Weiß <weiss@tux4u.de>
+ *  Copyright (C)2011, Johannes WeiÃÂ <weiss@tux4u.de>
  *                   , Jonathan Dimond <jonny@dimond.de>
  *
  *  This program is free software: you can redistribute it and/or modify
@@ -33,19 +33,29 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 
+#ifdef WITH_NI
+#include <NIDAQmxBase.h>
+#define \
+    CHK(functionCall) { \
+        printf("NI call...\n"); fflush(stdout); \
+        if( DAQmxFailed(ni_errno=(functionCall)) ) { \
+            finish_ni(h); \
+        } \
+    }
+#endif
+
 #include <assert.h>
 
 #include "common.h"
 #include "daemon.h"
 #include "sync.h"
 #include "handler.h"
+#include <common/conf.h>
 
 #define DAQmx_Val_GroupByChannel 0
 #define SERVER_PORT 12345
 #define LISTEN_QUEUE_LEN 8
 #define BUFFER_SAMPLES_PER_CHANNEL 1024
-#define SAMPLING_RATE 50000
-
 
 static const double TEST_ANALOG_DATA[] =
     { 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, /* channel 1 */
@@ -59,12 +69,17 @@ static const digival_t TEST_DIGITAL_DATA[] =
       0, 0, 1, 0, 0, 0, 1, 0, 0, 0  /* channel 3 */
     };
 
+#ifdef WITH_NI
+volatile int32 ni_errno = 0;
+#endif
+
 volatile bool running = true;
 static void sig_hnd() {
     printf("Ctrl+C caught, exiting...\n");
     running = false;
 }
 
+#ifndef WITH_NI
 static double timediff(struct timespec *start, struct timespec *end) {
     double d;
     struct timespec temp;
@@ -82,10 +97,59 @@ static double timediff(struct timespec *start, struct timespec *end) {
            */
     return d;
 }
+#endif
 
-static int read_dummy(void *handle, unsigned int sampling_rate, time_t timeout,
-                      int format, double *buffer, size_t data_size,
-                      unsigned int *points_per_channel, void *unused) {
+static void finish_ni(void *task_handle_opaque) {
+#ifdef WITH_NI
+    TaskHandle *h = (TaskHandle *)task_handle_opaque;
+    char errBuff[2048] = { 0 };
+
+    if( DAQmxFailed(ni_errno) )
+        DAQmxBaseGetExtendedErrorInfo(errBuff, 2048);
+    if(h != 0) {
+        DAQmxBaseStopTask (*h);
+        DAQmxBaseClearTask (*h);
+    }
+    if( DAQmxFailed(ni_errno) ) {
+        printf ("DAQmxBase Error %d %s\n", (int)ni_errno, errBuff);
+    }
+    free(task_handle_opaque);
+#endif
+}
+
+static void *init_ni(void) {
+    void *task_handle_opaque = NULL;
+#ifdef WITH_NI
+    TaskHandle *h = malloc(sizeof *h);
+    assert(NULL != h);
+    CHK(DAQmxBaseCreateTask("analog-inputs", h));
+    CHK(DAQmxBaseCreateAIVoltageChan(*h, ni_channels, NULL, DAQmx_Val_Diff,
+                                     U_MIN, U_MAX, DAQmx_Val_Volts, NULL));
+    CHK(DAQmxBaseCfgSampClkTiming(*h, CLK_SRC, SAMPLING_RATE,
+                                  DAQmx_Val_Rising, DAQmx_Val_ContSamps,
+                                  0));
+    CHK(DAQmxBaseStartTask(*h));
+    task_handle_opaque = h;
+#endif
+    return task_handle_opaque;
+}
+
+static void read_ni(void *opaque_task_handle, const size_t data_size,
+                    double *analog_data, unsigned int *points_pc_long) {
+    int32 points_pc = 0;
+    TaskHandle *h = (TaskHandle *)opaque_task_handle;
+    CHK(DAQmxBaseReadAnalogF64(*h, SAMPLING_RATE, TIMEOUT,
+                               DAQmx_Val_GroupByChannel, analog_data,
+                               data_size, &points_pc, NULL));
+    *points_pc_long = points_pc;
+}
+
+#ifndef WITH_NI
+static int DAQmxBaseReadAnalogF64(void *handle, unsigned int sampling_rate,
+                                  time_t timeout, int format, double *buffer,
+                                  size_t data_size,
+                                  unsigned int *points_per_channel,
+                                  void *unused) {
     static struct timespec last = { 0, 0};
     struct timespec current;
     (void)handle;
@@ -109,15 +173,19 @@ static int read_dummy(void *handle, unsigned int sampling_rate, time_t timeout,
 
     return 0;
 }
+#endif
+
 
 static void *ni_thread_main(void *opaque_info) {
     input_data_t *info = (input_data_t *)opaque_info;
     unsigned int points_pc;
     const unsigned int num_channels = 3;
-    double analog_data[BUFFER_SAMPLES_PER_CHANNEL * num_channels];
-    digival_t digital_data[BUFFER_SAMPLES_PER_CHANNEL * num_channels];
+    const size_t data_size = BUFFER_SAMPLES_PER_CHANNEL * num_channels;
+    double analog_data[data_size];
+    digival_t digital_data[data_size];
     (void)digital_data;
     uint64_t timestamp = 0;
+    void *h = init_ni();
 
     while(running) {
         wait_read_barrier();
@@ -126,8 +194,7 @@ static void *ni_thread_main(void *opaque_info) {
         }
         reset_ready_handlers();
         /* notify_data_unavailable(); */
-        read_dummy(NULL, SAMPLING_RATE, 0, DAQmx_Val_GroupByChannel, analog_data,
-                   1000, &points_pc, NULL);
+        read_ni(h, data_size, analog_data, &points_pc);
         memcpy(digital_data, TEST_DIGITAL_DATA, 30 * sizeof(digival_t));
         /*
         for i = 1 to n:

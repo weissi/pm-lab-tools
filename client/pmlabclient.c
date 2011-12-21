@@ -163,8 +163,8 @@ void pmlc_close(void *h) {
 
 int main(int argc, char *argv[])
 {
-    uint32_t channels[] = {1, 3};
-    void* handle = pmlc_connect("127.0.0.1", 12345, channels , 2);
+    uint32_t channels[] = {4};
+    void* handle = pmlc_connect("192.168.21.201", 12345, channels , 1);
     size_t buffer_sizes = 4096;
     double analog_data[4096];
     digival_t digital_data[4096];
@@ -180,7 +180,11 @@ int main(int argc, char *argv[])
                   &timestamp);
         printf("Read %u samples starting at second %"PRIu64"\n",
                sample_count,
-               timestamp/1000000000L);
+               timestamp);
+        for(int j=0; j<10; j++) {
+            printf("%f, ", analog_data[j]);
+        }
+        printf("\n");
     }
     pmlc_close(handle);
 }
