@@ -19,6 +19,19 @@ typedef struct {
     int sockfd;
 } pm_handle;
 
+static int write_fully(int fd, void *buffer, ssize_t count) {
+    ssize_t total_written = 0;
+    ssize_t bytes_written = 0;
+    while(total_written < count) {
+        bytes_written = write(fd, (char *)buffer+total_written, count-total_written);
+        if (bytes_written <= 0) {
+            return -1;
+        }
+        total_written += bytes_written;
+    }
+    return 0;
+}
+
 static int read_fully(int fd, void *buffer, ssize_t count) {
     ssize_t total_read = 0;
     ssize_t bytes_read = 0;
@@ -34,12 +47,14 @@ static int read_fully(int fd, void *buffer, ssize_t count) {
 
 void *pmlc_connect(char *server,
                    unsigned short port,
-                   unsigned int *channels,
-                   unsigned int num_channels) {
+                   uint32_t *channels,
+                   uint32_t num_channels) {
     struct sockaddr_in server_addr;
     int sockfd;
-    int err;
+    int err, i;
     char welcome_msg[sizeof(WELCOME_MSG)];
+    uint32_t net_nc = htonl(num_channels);
+    uint32_t *net_channels = alloca(sizeof(uint32_t)*num_channels);
     pm_handle *handle;
 
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -53,10 +68,23 @@ void *pmlc_connect(char *server,
     err = connect(sockfd, (struct sockaddr *) &server_addr, sizeof(server_addr));
     assert(0 == err);
 
+    /* convert integers to network endianess */
+    net_nc = htonl(num_channels);
+    for(i = 0; i < num_channels; i++) {
+        net_channels[i] = htonl(channels[i]);
+    }
+    /* send channel description */
+    err = write_fully(sockfd, &net_nc, sizeof(num_channels));
+    assert(0 == err);
+    err = write_fully(sockfd, net_channels, num_channels*sizeof(uint32_t));
+
+
     err = read_fully(sockfd, welcome_msg, sizeof(WELCOME_MSG));
     assert(0 == err);
     printf("%s\n", welcome_msg);
     assert(0 == strncmp(WELCOME_MSG, welcome_msg, sizeof(WELCOME_MSG)));
+
+    printf("waht up\n");
 
     /* Only create structure once connection is established */
     handle = (pm_handle *)malloc(sizeof(pm_handle));
@@ -76,7 +104,7 @@ int pmlc_read(void *h,
     int err;
     pm_handle *handle;
     char magic_data_buffer[sizeof(MAGIC_DATA_SET)];
-    uint32_t msg_len;
+    uint32_t msg_len, net_msg_len;
     void *msg_buffer;
     int i;
     unsigned int offset;
@@ -89,8 +117,9 @@ int pmlc_read(void *h,
     assert(0==err);
     assert(0==strncmp(MAGIC_DATA_SET, magic_data_buffer, sizeof(MAGIC_DATA_SET)));
 
-    err = read_fully(handle->sockfd, &msg_len, sizeof(uint32_t));
+    err = read_fully(handle->sockfd, &net_msg_len, sizeof(uint32_t));
     assert(0==err);
+    msg_len = ntohl(net_msg_len);
 
     msg_buffer = malloc(msg_len);
     err = read_fully(handle->sockfd, msg_buffer, msg_len);
@@ -134,7 +163,8 @@ void pmlc_close(void *h) {
 
 int main(int argc, char *argv[])
 {
-    void* handle = pmlc_connect("127.0.0.1", 12345, NULL, 0);
+    uint32_t channels[] = {1, 3};
+    void* handle = pmlc_connect("127.0.0.1", 12345, channels , 2);
     size_t buffer_sizes = 4096;
     double analog_data[4096];
     digival_t digital_data[4096];

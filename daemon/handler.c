@@ -8,6 +8,7 @@
 #include <string.h>
 #include <errno.h>
 #include <stdlib.h>
+#include <arpa/inet.h>
 
 #include "daemon.h"
 #include "sync.h"
@@ -81,6 +82,7 @@ static int write_dataset(int fd,
     msg_ds.channel_data = msg_dps;
 
     const uint32_t msg_len = data_set__get_packed_size(&msg_ds);
+    const uint32_t net_msg_len = htonl(msg_len);
     void *buf = malloc(msg_len);
     assert(NULL != buf);
 
@@ -95,7 +97,7 @@ static int write_dataset(int fd,
     }
     ret += err;
 
-    err = write(fd, &msg_len, sizeof(uint32_t));
+    err = write(fd, &net_msg_len, sizeof(uint32_t));
     if (err < 0) {
         goto finally;
     } else {
@@ -264,10 +266,11 @@ void *handler_sender_main(void *opaque_sender_info) {
 }
 
 void *handler_thread_main(void *opaque_info) {
-    unsigned int my_channels[] = { 0, 1, 2 };
-    unsigned int my_num_channels = 3;
     handler_thread_info_t *info = (handler_thread_info_t *)opaque_info;
-    int err;
+    int err, i;
+    uint32_t net_nc, num_channels;
+    uint32_t *net_channels;
+    uint32_t *channels;
     time_t last_data = 0;
     pthread_t sender_thread;
     volatile bool handler_running = true;
@@ -277,14 +280,34 @@ void *handler_thread_main(void *opaque_info) {
                                 , .max_elems = BUF_SIZE
                                 , .start = 0
                                 };
-    sender_thread_info_t sender_info = { .buffer_desc = &buffer_desc
-                                       , .handler_running = &handler_running
-                                       , .conn_fd = info->fd
-                                       , .num_channels = my_num_channels
-                                       , .channels = my_channels
-                                       };
+    sender_thread_info_t sender_info;
     assert(NULL != buffer_desc.buffer);
     buffer_desc.start = buffer_desc.buffer;
+
+    /* read channel information */
+    err = read(info->fd, &net_nc, sizeof(uint32_t));
+    assert(sizeof(uint32_t) == err);
+    num_channels = ntohl(net_nc);
+
+    net_channels = alloca(sizeof(uint32_t)*num_channels);
+    channels = alloca(sizeof(uint32_t)*num_channels);
+    err = read(info->fd, net_channels, sizeof(uint32_t)*num_channels);
+    assert(sizeof(uint32_t)*num_channels == err);
+    for(i = 0; i < num_channels; i++) {
+        channels[i] = ntohl(net_channels[i]);
+    }
+
+    sender_info.buffer_desc = &buffer_desc;
+    sender_info.handler_running = &handler_running;
+    sender_info.conn_fd = info->fd;
+    sender_info.num_channels = num_channels;
+    sender_info.channels = channels;
+    /*= { .buffer_desc = &buffer_desc
+                  , .handler_running = &handler_running
+                  , .conn_fd = info->fd
+                  , .num_channels = num_channels
+                  , .channels = channels
+                  };*/
 
     err = pthread_create(&sender_thread, NULL, handler_sender_main, &sender_info);
     assert(0 == err);
