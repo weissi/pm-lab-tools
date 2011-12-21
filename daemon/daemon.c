@@ -134,22 +134,11 @@ static void *init_ni(void) {
     return task_handle_opaque;
 }
 
-static void read_ni(void *opaque_task_handle, const size_t data_size,
-                    double *analog_data, unsigned int *points_pc_long) {
-    int32 points_pc = 0;
-    TaskHandle *h = (TaskHandle *)opaque_task_handle;
-    CHK(DAQmxBaseReadAnalogF64(*h, SAMPLING_RATE, TIMEOUT,
-                               DAQmx_Val_GroupByChannel, analog_data,
-                               data_size, &points_pc, NULL));
-    *points_pc_long = points_pc;
-}
-
-#ifndef WITH_NI
-static int DAQmxBaseReadAnalogF64(void *handle, unsigned int sampling_rate,
-                                  time_t timeout, int format, double *buffer,
-                                  size_t data_size,
-                                  unsigned int *points_per_channel,
-                                  void *unused) {
+static int read_dummy(void *handle, unsigned int sampling_rate,
+                      time_t timeout, int format, double *buffer,
+                      size_t data_size,
+                      unsigned int *points_per_channel,
+                      void *unused) {
     static struct timespec last = { 0, 0};
     struct timespec current;
     (void)handle;
@@ -173,8 +162,23 @@ static int DAQmxBaseReadAnalogF64(void *handle, unsigned int sampling_rate,
 
     return 0;
 }
-#endif
 
+static void read_ni(void *opaque_task_handle, const size_t data_size,
+                    double *analog_data, unsigned int *points_pc_long) {
+#ifdef WITH_NI
+    int32 points_pc = 0;
+    TaskHandle *h = (TaskHandle *)opaque_task_handle;
+    CHK(DAQmxBaseReadAnalogF64(*h, SAMPLING_RATE, TIMEOUT,
+                               DAQmx_Val_GroupByChannel, analog_data,
+                               data_size, &points_pc, NULL));
+    *points_pc_long = points_pc;
+#endif
+#ifndef WITH_NI
+    read_dummy(opaque_task_handle, SAMPLING_RATE, TIMEOUT,
+               DAQmx_Val_GroupByChannel, analog_data,
+               data_size, points_pc_long, NULL);
+#endif
+}
 
 static void *ni_thread_main(void *opaque_info) {
     input_data_t *info = (input_data_t *)opaque_info;
@@ -209,6 +213,8 @@ static void *ni_thread_main(void *opaque_info) {
         timestamp += TIME_S * points_pc / SAMPLING_RATE;
         notify_data_available();
     }
+
+    finish_ni(h);
     return NULL;
 }
 

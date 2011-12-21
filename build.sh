@@ -32,6 +32,7 @@ cd ..
 echo
 echo "Building Client"
 
+rm build/*.o &> /dev/null || true
 compile_c client/pmlabclient
 for f in gensrc/*.c; do
     compile_c ${f%*.c}
@@ -39,6 +40,9 @@ done
 echo "- Linking pmlabclient"
 gcc $LDFLAGS -lprotobuf-c -o build/pmlabclient build/*.o
 
+echo
+echo "Building Daemon"
+rm build/*.o &> /dev/null || true
 compile_c daemon/daemon
 compile_c daemon/handler
 compile_c daemon/sync
