@@ -359,4 +359,3 @@ void *handler_thread_main(void *opaque_info) {
     free(opaque_info);
     return NULL;
 }
-

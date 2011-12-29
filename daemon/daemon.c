@@ -1,7 +1,7 @@
 /*
  *  Records analog data from a NI USB-6218 and send it to connected clients
  *
- *  Copyright (C)2011, Johannes WeiÃÂ <weiss@tux4u.de>
+ *  Copyright (C)2011, Johannes Weiß <weiss@tux4u.de>
  *                   , Jonathan Dimond <jonny@dimond.de>
  *
  *  This program is free software: you can redistribute it and/or modify
@@ -55,19 +55,10 @@
 #define DAQmx_Val_GroupByChannel 0
 #define SERVER_PORT 12345
 #define LISTEN_QUEUE_LEN 8
-#define BUFFER_SAMPLES_PER_CHANNEL 1024
+#define BUFFER_SAMPLES_PER_CHANNEL 30000
 
-static const double TEST_ANALOG_DATA[] =
-    { 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, /* channel 1 */
-      0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, /* channel 2 */
-      0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0  /* channel 3 */
-    };
-
-static const digival_t TEST_DIGITAL_DATA[] =
-    { 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, /* channel 1 */
-      0, 1, 0, 0, 0, 0, 1, 0, 0, 0, /* channel 2 */
-      0, 0, 1, 0, 0, 0, 1, 0, 0, 0  /* channel 3 */
-    };
+#include "test_data.h"
+static const digival_t TEST_DIGITAL_DATA[240000] = { 0 };
 
 #ifdef WITH_NI
 volatile int32 ni_errno = 0;
@@ -78,26 +69,6 @@ static void sig_hnd() {
     printf("Ctrl+C caught, exiting...\n");
     running = false;
 }
-
-#ifndef WITH_NI
-static double timediff(struct timespec *start, struct timespec *end) {
-    double d;
-    struct timespec temp;
-    if ((end->tv_nsec-start->tv_nsec)<0) {
-        temp.tv_sec = end->tv_sec-start->tv_sec-1;
-        temp.tv_nsec = 1000000000+end->tv_nsec-start->tv_nsec;
-    } else {
-        temp.tv_sec = end->tv_sec-start->tv_sec;
-        temp.tv_nsec = end->tv_nsec-start->tv_nsec;
-    }
-    d = temp.tv_sec + (temp.tv_nsec / 1000000000.0);
-    /*
-    printf("%ld.%ld - %ld.%ld = %ld.%ld = %f = %e\n", end.tv_sec, end.tv_nsec,
-           start.tv_sec, start.tv_nsec, temp.tv_sec, temp.tv_nsec, d, d);
-           */
-    return d;
-}
-#endif
 
 static void finish_ni(void *task_handle_opaque) {
 #ifdef WITH_NI
@@ -134,32 +105,25 @@ static void *init_ni(void) {
     return task_handle_opaque;
 }
 
-static int read_dummy(void *handle, unsigned int sampling_rate,
-                      time_t timeout, int format, double *buffer,
-                      size_t data_size,
-                      unsigned int *points_per_channel,
-                      void *unused) {
-    static struct timespec last = { 0, 0};
-    struct timespec current;
-    (void)handle;
-    (void)sampling_rate;
+int read_dummy(void *handle, unsigned int sampling_rate,
+               time_t timeout, int format, double *buffer,
+               size_t data_size,
+               unsigned int *points_per_channel,
+               void *unused) {
+    struct timespec t_start;
+
+    assert(NULL == handle);
+    assert(30000 == sampling_rate);
     (void)timeout;
-    (void)unused;
     assert(DAQmx_Val_GroupByChannel == format);
+    assert(sizeof(TEST_ANALOG_DATA)/sizeof(double) <= data_size);
+    *points_per_channel = 30000;
+    (void)unused;
 
-    assert(30 <= data_size);
-    *points_per_channel = 10;
-    /* sleep(3); */
+    clock_gettime(CLOCK_REALTIME, &t_start);
     memcpy(buffer, TEST_ANALOG_DATA, 30 * sizeof(double));
-    /* usleep(200000); */
-
-    clock_gettime(CLOCK_REALTIME, &current);
-    if(last.tv_sec != 0) {
-        assert(0.1 > timediff(&last, &current));
-        last = current;
-    }
-    usleep(100);
-
+    t_start.tv_sec += 1;
+    clock_nanosleep(CLOCK_REALTIME, TIMER_ABSTIME, &t_start, NULL);
     return 0;
 }
 
@@ -183,7 +147,7 @@ static void read_ni(void *opaque_task_handle, const size_t data_size,
 static void *ni_thread_main(void *opaque_info) {
     input_data_t *info = (input_data_t *)opaque_info;
     unsigned int points_pc;
-    const unsigned int num_channels = 3;
+    const unsigned int num_channels = 8;
     const size_t data_size = BUFFER_SAMPLES_PER_CHANNEL * num_channels;
     double analog_data[data_size];
     digival_t digital_data[data_size];

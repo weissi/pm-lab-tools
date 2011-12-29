@@ -60,7 +60,7 @@ void wait_read_barrier(void) {
     err = pthread_mutex_unlock(&__mutex_read);
     assert(0 == err);
     STOP_TIMING(timer);
-    PRINT_TIMING(timer, "wait_read_barrier");
+    //PRINT_TIMING(timer, "wait_read_barrier");
 }
 
 void notify_read_barrier(void) {
@@ -93,8 +93,6 @@ time_t wait_data_available(time_t last_data) {
 }
 
 void notify_data_available(void) {
-    printf("DA\n");
-    fflush(stdout);
     pthread_mutex_lock(&__mutex_data);
     __data_available++;
     pthread_mutex_unlock(&__mutex_data);
