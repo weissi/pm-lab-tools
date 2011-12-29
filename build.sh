@@ -45,9 +45,14 @@ done
 echo "- Linking pmlabclient"
 gcc $LDFLAGS -lprotobuf-c -o build/pmlabclient build/*.o
 
+rm build/*.o &> /dev/null || true
+
+echo
+echo "Building Utils"
+compile_c common/utils
+
 echo
 echo "Building Daemon"
-rm build/*.o &> /dev/null || true
 compile_c daemon/daemon
 compile_c daemon/handler
 compile_c daemon/sync

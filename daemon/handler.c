@@ -10,6 +10,8 @@
 #include <stdlib.h>
 #include <arpa/inet.h>
 
+#include <utils.h>
+
 #include "daemon.h"
 #include "sync.h"
 
@@ -89,7 +91,7 @@ static int write_dataset(int fd,
     data_set__pack(&msg_ds, buf);
 
     ret = 0;
-    err = write(fd, MAGIC_DATA_SET, sizeof(MAGIC_DATA_SET));
+    err = full_write(fd, MAGIC_DATA_SET, sizeof(MAGIC_DATA_SET));
     if (err < 0) {
         goto finally;
     } else {
@@ -97,7 +99,7 @@ static int write_dataset(int fd,
     }
     ret += err;
 
-    err = write(fd, &net_msg_len, sizeof(uint32_t));
+    err = full_write(fd, (char *)&net_msg_len, sizeof(uint32_t));
     if (err < 0) {
         goto finally;
     } else {
@@ -105,7 +107,7 @@ static int write_dataset(int fd,
     }
     ret += err;
 
-    err = write(fd, buf, msg_len);
+    err = full_write(fd, buf, msg_len);
     if (err < 0) {
         goto finally;
     } else {
@@ -314,7 +316,7 @@ void *handler_thread_main(void *opaque_info) {
 
     printf("Handler thread accepted %d\n", info->fd);
     inc_available_handlers();
-    err = write(info->fd, WELCOME_MSG, sizeof(WELCOME_MSG));
+    err = full_write(info->fd, WELCOME_MSG, sizeof(WELCOME_MSG));
     assert(sizeof(WELCOME_MSG) == err);
 
     while(running) {
