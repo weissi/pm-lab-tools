@@ -6,7 +6,7 @@
 #include "common.h"
 
 void *pmlc_connect(char *server,
-                   unsigned short port,
+                   char *port,
                    unsigned int *channels,
                    unsigned int num_channels);
 

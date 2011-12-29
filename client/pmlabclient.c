@@ -7,6 +7,8 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <inttypes.h>
+#include <netdb.h>
+
 
 #include "measured-data.pb-c.h"
 
@@ -46,10 +48,11 @@ static int read_fully(int fd, void *buffer, ssize_t count) {
 }
 
 void *pmlc_connect(char *server,
-                   unsigned short port,
+                   char *port,
                    uint32_t *channels,
                    uint32_t num_channels) {
-    struct sockaddr_in server_addr;
+    struct addrinfo hints;
+    struct addrinfo *result, *rp;
     int sockfd;
     int err, i;
     char welcome_msg[sizeof(WELCOME_MSG)];
@@ -57,22 +60,45 @@ void *pmlc_connect(char *server,
     uint32_t *net_channels = alloca(sizeof(uint32_t)*num_channels);
     pm_handle *handle;
 
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    assert(0 <= sockfd);
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = 0;
+    hints.ai_canonname = NULL;
+    hints.ai_addr = NULL;
+    hints.ai_next = NULL;
 
-    memset(&server_addr, 0, sizeof(server_addr));
-    server_addr.sin_family      = AF_INET;
-    server_addr.sin_addr.s_addr = inet_addr(server);
-    server_addr.sin_port        = htons(port);
+    err = getaddrinfo(server, port, &hints, &result);
+    if(0 != err) {
+        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(err));
+        exit(EXIT_FAILURE);
+    }
 
-    err = connect(sockfd, (struct sockaddr *) &server_addr, sizeof(server_addr));
-    assert(0 == err);
+    for(rp = result; rp != NULL; rp = rp->ai_next) {
+        sockfd = socket(rp->ai_family, rp->ai_socktype,
+                        rp->ai_protocol);
+        if(-1 == sockfd) {
+            continue;
+        }
+
+        if(-1 != connect(sockfd, rp->ai_addr, rp->ai_addrlen)) {
+            break;
+        }
+        close(sockfd);
+    }
+
+    if(NULL == rp) {
+        fprintf(stderr, "Could not connect\n");
+        exit(EXIT_FAILURE);
+    }
+
+    freeaddrinfo(result);
 
     /* convert integers to network endianess */
     net_nc = htonl(num_channels);
     for(i = 0; i < num_channels; i++) {
         net_channels[i] = htonl(channels[i]);
     }
+
     /* send channel description */
     err = write_fully(sockfd, &net_nc, sizeof(num_channels));
     assert(0 == err);
@@ -164,14 +190,22 @@ void pmlc_close(void *h) {
 int main(int argc, char *argv[])
 {
     uint32_t channels[] = {4};
-    void* handle = pmlc_connect("192.168.21.201", 12345, channels , 1);
+    void *handle = NULL;
     size_t buffer_sizes = 4096;
     double analog_data[4096];
     digival_t digital_data[4096];
     unsigned int sample_count;
     uint64_t timestamp;
-    int i=0;
-    for (i=0; i<10000; i++) {
+
+    if(1 == argc) {
+        printf("Connecting to localhost:12345\n");
+        handle = pmlc_connect("127.0.0.1", "12345", channels , 1);
+    } else if(3 == argc) {
+        printf("Connecting to %s:%s\n", argv[1], argv[2]);
+        handle = pmlc_connect(argv[1], argv[2], channels , 1);
+    }
+
+    for (int i=0; i<10000; i++) {
         pmlc_read(handle,
                   buffer_sizes,
                   analog_data,
