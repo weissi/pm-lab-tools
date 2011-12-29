@@ -7,8 +7,13 @@ cd "$HERE"
 
 rm build/* &> /dev/null || true
 
-NI_CFLAGS="-DWITH_NI"
-NI_LDFLAGS="-lnidaqmxbase"
+if [ "$1" = "-n" ]; then
+    NI_CFLAGS=""
+    NI_LDFLAGS=""
+else
+    NI_CFLAGS="-DWITH_NI"
+    NI_LDFLAGS="-lnidaqmxbase"
+fi
 
 CFLAGS="$CFLAGS $NI_CFLAGS -I$HERE -ggdb"
 LDFLAGS="$LDFLAGS -ggdb"
