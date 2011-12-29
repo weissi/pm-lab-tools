@@ -9,6 +9,7 @@
 #include <inttypes.h>
 #include <netdb.h>
 
+#include <utils.h>
 
 #include "measured-data.pb-c.h"
 
@@ -21,38 +22,12 @@ typedef struct {
     int sockfd;
 } pm_handle;
 
-static int write_fully(int fd, void *buffer, ssize_t count) {
-    ssize_t total_written = 0;
-    ssize_t bytes_written = 0;
-    while(total_written < count) {
-        bytes_written = write(fd, (char *)buffer+total_written, count-total_written);
-        if (bytes_written <= 0) {
-            return -1;
-        }
-        total_written += bytes_written;
-    }
-    return 0;
-}
-
-static int read_fully(int fd, void *buffer, ssize_t count) {
-    ssize_t total_read = 0;
-    ssize_t bytes_read = 0;
-    while(total_read < count) {
-        bytes_read = read(fd, (char *)buffer+total_read, count-total_read);
-        if (bytes_read <= 0) {
-            return -1;
-        }
-        total_read += bytes_read;
-    }
-    return 0;
-}
-
 void *pmlc_connect(char *server,
                    char *port,
                    uint32_t *channels,
                    uint32_t num_channels) {
-    struct addrinfo hints;
-    struct addrinfo *result, *rp;
+    struct addrinfo hints = { 0 };
+    struct addrinfo *result = NULL, *rp = NULL;
     int sockfd;
     int err, i;
     char welcome_msg[sizeof(WELCOME_MSG)];
@@ -100,13 +75,12 @@ void *pmlc_connect(char *server,
     }
 
     /* send channel description */
-    err = write_fully(sockfd, &net_nc, sizeof(num_channels));
-    assert(0 == err);
-    err = write_fully(sockfd, net_channels, num_channels*sizeof(uint32_t));
+    err = full_write(sockfd, (char *)&net_nc, sizeof(num_channels));
+    assert(sizeof(num_channels) == err);
+    err = full_write(sockfd, (char *)net_channels, num_channels*sizeof(uint32_t));
 
-
-    err = read_fully(sockfd, welcome_msg, sizeof(WELCOME_MSG));
-    assert(0 == err);
+    err = full_read(sockfd, welcome_msg, sizeof(WELCOME_MSG));
+    assert(sizeof(WELCOME_MSG) == err);
     printf("%s\n", welcome_msg);
     assert(0 == strncmp(WELCOME_MSG, welcome_msg, sizeof(WELCOME_MSG)));
 
@@ -139,17 +113,17 @@ int pmlc_read(void *h,
     handle = (pm_handle *)h;
     assert(PM_HANDLE_MAGIC_NUMBER == handle->magic_number);
 
-    err = read_fully(handle->sockfd, magic_data_buffer, sizeof(MAGIC_DATA_SET));
-    assert(0==err);
+    err = full_read(handle->sockfd, magic_data_buffer, sizeof(MAGIC_DATA_SET));
+    assert(sizeof(MAGIC_DATA_SET)==err);
     assert(0==strncmp(MAGIC_DATA_SET, magic_data_buffer, sizeof(MAGIC_DATA_SET)));
 
-    err = read_fully(handle->sockfd, &net_msg_len, sizeof(uint32_t));
-    assert(0==err);
+    err = full_read(handle->sockfd, (char *)&net_msg_len, sizeof(uint32_t));
+    assert(sizeof(uint32_t)==err);
     msg_len = ntohl(net_msg_len);
 
     msg_buffer = malloc(msg_len);
-    err = read_fully(handle->sockfd, msg_buffer, msg_len);
-    assert(0==err);
+    err = full_read(handle->sockfd, msg_buffer, msg_len);
+    assert(msg_len==err);
 
     msg_ds = data_set__unpack(NULL, msg_len, msg_buffer);
     free(msg_buffer);
@@ -159,9 +133,9 @@ int pmlc_read(void *h,
         DataPoints *points = msg_ds->channel_data[i];
         unsigned int n_samples = points->n_analog_data;
 
-        assert(n_samples==msg_ds->channel_data[0]->n_analog_data);
-        assert(n_samples==points->n_digital_data);
-        assert(buffer_sizes>=offset+n_samples);
+        assert(n_samples == points->n_analog_data);
+        assert(n_samples == points->n_digital_data);
+        assert(buffer_sizes >= offset+n_samples);
 
         memcpy(analog_data + offset, points->analog_data, n_samples);
         memcpy(digital_data + offset, points->digital_data, n_samples);
@@ -191,9 +165,9 @@ int main(int argc, char *argv[])
 {
     uint32_t channels[] = {4};
     void *handle = NULL;
-    size_t buffer_sizes = 4096;
-    double analog_data[4096];
-    digival_t digital_data[4096];
+    const size_t buffer_sizes = 240000;
+    double analog_data[buffer_sizes];
+    digival_t digital_data[buffer_sizes];
     unsigned int sample_count;
     uint64_t timestamp;
 
@@ -214,7 +188,7 @@ int main(int argc, char *argv[])
                   &timestamp);
         printf("Read %u samples starting at second %"PRIu64"\n",
                sample_count,
-               timestamp);
+               timestamp / 1000000000L);
         for(int j=0; j<10; j++) {
             printf("%f, ", analog_data[j]);
         }

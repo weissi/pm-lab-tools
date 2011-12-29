@@ -14,10 +14,10 @@ enum channel_ids {
 
 const char *ni_channels = "Dev1/ai0, Dev1/ai1, Dev1/ai2, Dev1/ai3,"
     "Dev1/ai4, Dev1/ai5, Dev1/ai6, Dev1/ai7";
-#define U_MIN (-0.2)
-#define U_MAX (0.2)
+#define U_MIN ((double)-0.2)
+#define U_MAX ((double)0.2)
 #define CLK_SRC "OnboardClock"
-#define SAMPLING_RATE 30000
-#define TIMEOUT 10
+#define SAMPLING_RATE ((unsigned int)30000)
+#define TIMEOUT ((unsigned int)10)
 
 #endif

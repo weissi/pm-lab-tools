@@ -3,8 +3,8 @@
 
 #include <time.h>
 
-#define TIME_MS (1000000L)
-#define TIME_S (1000*(TIME_MS))
+#define TIME_MS ((unsigned long int)1000000L)
+#define TIME_S ((unsigned long int)(1000L*(TIME_MS)))
 
 #define WAIT_TIMEOUT ((struct timespec){1, 500L*TIME_MS})
 

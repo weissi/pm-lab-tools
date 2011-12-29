@@ -32,6 +32,7 @@
 #include <time.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <inttypes.h>
 
 #ifdef WITH_NI
 #include <NIDAQmxBase.h>
@@ -173,8 +174,8 @@ static void *ni_thread_main(void *opaque_info) {
         info->num_channels = num_channels;
         info->analog_data = analog_data;
         info->digital_data = digital_data;
-        printf("NI: read successful\n");
-        timestamp += TIME_S * points_pc / SAMPLING_RATE;
+        timestamp += ((uint64_t)TIME_S) * ((uint64_t)points_pc) / ((uint64_t)SAMPLING_RATE);
+        printf("NI: read successful, ts = %"PRIu64"\n", timestamp);
         notify_data_available();
     }
 
