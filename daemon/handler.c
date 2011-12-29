@@ -87,6 +87,7 @@ static int write_dataset(int fd,
     const uint32_t net_msg_len = htonl(msg_len);
     void *buf = malloc(msg_len);
     assert(NULL != buf);
+    memset(buf, msg_len, 0);
 
     data_set__pack(&msg_ds, buf);
 
