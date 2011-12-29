@@ -10,6 +10,7 @@ rm build/* &> /dev/null || true
 if [ "$1" = "-n" ]; then
     NI_CFLAGS=""
     NI_LDFLAGS=""
+    shift
 else
     NI_CFLAGS="-DWITH_NI"
     NI_LDFLAGS="-lnidaqmxbase"
@@ -24,9 +25,6 @@ function compile_c() {
         -Idaemon -Icommon -Igensrc -o "build/$(basename $1).o" $1.c
 }
 
-echo "Building Deamon"
-
-
 echo "- Generating protos"
 cd protos &> /dev/null
 for f in *.proto; do
@@ -34,30 +32,37 @@ for f in *.proto; do
 done
 cd ..
 
-echo
-echo "Building Client"
+if [ "$#" -lt 1 -o "$1" = "client" ]; then
+    rm build/*.o &> /dev/null || true
+    echo
+    echo "Building Utils"
+    compile_c common/utils
 
-rm build/*.o &> /dev/null || true
-compile_c client/pmlabclient
-for f in gensrc/*.c; do
-    compile_c ${f%*.c}
-done
-echo "- Linking pmlabclient"
-gcc $LDFLAGS -lprotobuf-c -o build/pmlabclient build/*.o
+    echo
+    echo "Building Client"
 
-rm build/*.o &> /dev/null || true
+    compile_c client/pmlabclient
+    for f in gensrc/*.c; do
+        compile_c ${f%*.c}
+    done
+    echo "- Linking pmlabclient"
+    gcc $LDFLAGS -lprotobuf-c -o build/pmlabclient build/*.o
+fi
 
-echo
-echo "Building Utils"
-compile_c common/utils
+if [ "$#" -lt 1 -o "$1" = "daemon" ]; then
+    rm build/*.o &> /dev/null || true
+    echo
+    echo "Building Utils"
+    compile_c common/utils
 
-echo
-echo "Building Daemon"
-compile_c daemon/daemon
-compile_c daemon/handler
-compile_c daemon/sync
-for f in gensrc/*.c; do
-    compile_c ${f%*.c}
-done
-echo "- Linking deamon"
-gcc $LDFLAGS $NI_LDFLAGS -lprotobuf-c -lrt -lpthread -o build/daemon build/*.o
+    echo
+    echo "Building Daemon"
+    compile_c daemon/daemon
+    compile_c daemon/handler
+    compile_c daemon/sync
+    for f in gensrc/*.c; do
+        compile_c ${f%*.c}
+    done
+    echo "- Linking deamon"
+    gcc $LDFLAGS $NI_LDFLAGS -lprotobuf-c -lrt -lpthread -o build/daemon build/*.o
+fi
