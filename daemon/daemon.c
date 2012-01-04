@@ -180,7 +180,7 @@ static int read_ni(data_acq_info_t *dai, const size_t data_size,
     return 0;
 #endif
 #ifndef WITH_NI
-    read_dummy(dai, SAMPLING_RATE, TIMEOUT,
+    read_dummy(dai->opaque_task_handle, SAMPLING_RATE, TIMEOUT,
                DAQmx_Val_GroupByChannel, analog_data,
                data_size, points_pc_long, NULL);
     return 0;
