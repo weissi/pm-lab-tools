@@ -268,13 +268,15 @@ void *handler_sender_main(void *opaque_sender_info) {
                                 buffer_desc,
                                 sender_info->channels,
                                 sender_info->num_channels);
-        assert(0 != err || (0 == err && ! running));
-        if(0 > err) {
+        if (err > 0) {
+            /* everything okay */
+        } else if(err < 0) {
             /* ERROR */
             printf("Client %ld write failed: %s\n", pthread_self(), strerror(errno));
             break;
         } else {
-            assert(0 < err);
+            assert(0 == err);
+            assert(!running);
         }
     }
 
