@@ -58,7 +58,9 @@
 #define LISTEN_QUEUE_LEN 8
 #define BUFFER_SAMPLES_PER_CHANNEL 30000
 
+#ifndef WITH_NI
 #include "test_data.h"
+#endif
 static const digival_t TEST_DIGITAL_DATA[240000] = { 0 };
 
 #ifdef WITH_NI
@@ -106,6 +108,7 @@ static void *init_ni(void) {
     return task_handle_opaque;
 }
 
+#ifndef WITH_NI
 int read_dummy(void *handle, unsigned int sampling_rate,
                time_t timeout, int format, double *buffer,
                size_t data_size,
@@ -131,6 +134,7 @@ int read_dummy(void *handle, unsigned int sampling_rate,
 
     return 0;
 }
+#endif
 
 static void read_ni(void *opaque_task_handle, const size_t data_size,
                     double *analog_data, unsigned int *points_pc_long) {
