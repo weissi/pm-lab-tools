@@ -163,7 +163,8 @@ void pmlc_close(void *h) {
 
 int main(int argc, char *argv[])
 {
-    uint32_t channels[] = {4};
+    uint32_t channels[] = { 0, 1, 2, 3, 4, 5, 6, 7 };
+    unsigned int num_channels = sizeof(channels)/sizeof(uint32_t);
     void *handle = NULL;
     const size_t buffer_sizes = 240000;
     double analog_data[buffer_sizes];
@@ -173,10 +174,10 @@ int main(int argc, char *argv[])
 
     if(1 == argc) {
         printf("Connecting to localhost:12345\n");
-        handle = pmlc_connect("127.0.0.1", "12345", channels , 1);
+        handle = pmlc_connect("127.0.0.1", "12345", channels, num_channels);
     } else if(3 == argc) {
         printf("Connecting to %s:%s\n", argv[1], argv[2]);
-        handle = pmlc_connect(argv[1], argv[2], channels , 1);
+        handle = pmlc_connect(argv[1], argv[2], channels, num_channels);
     }
 
     for (int i=0; i<10000; i++) {
