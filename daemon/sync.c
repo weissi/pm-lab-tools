@@ -101,6 +101,8 @@ time_t wait_data_available(time_t last_data) {
 }
 
 void notify_data_available(void) {
+    int err;
+
     err = pthread_mutex_lock(&__mutex_data);
     assert(0 == err);
 
