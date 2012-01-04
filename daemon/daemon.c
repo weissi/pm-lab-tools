@@ -153,12 +153,12 @@ int read_dummy(void *handle, unsigned int sampling_rate,
 
 static int read_ni(data_acq_info_t *dai, const size_t data_size,
                    double *analog_data, unsigned int *points_pc_long) {
-#ifdef WITH_NI
-    int32 points_pc = 0;
-    TaskHandle *h = (TaskHandle *)dai->opaque_task_handle;
     if(dai->failed) {
         return EIO;
     }
+#ifdef WITH_NI
+    int32 points_pc = 0;
+    TaskHandle *h = (TaskHandle *)dai->opaque_task_handle;
     *((int32 *)dai->opaque_error) =
         DAQmxBaseReadAnalogF64(*h,
                                SAMPLING_RATE,
