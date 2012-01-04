@@ -5,7 +5,7 @@ set -e
 HERE=$(cd $(dirname ${BASH_SOURCE[0]}) > /dev/null && pwd)
 cd "$HERE"
 
-rm build/* &> /dev/null || true
+rm build/*.o &> /dev/null || true
 
 if [ "$1" = "-n" ]; then
     NI_CFLAGS=""
