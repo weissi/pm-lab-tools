@@ -23,6 +23,7 @@
 
 typedef struct {
     pthread_mutex_t lock;
+    pthread_cond_t cond;
     input_data_t *buffer;
     const size_t max_elems;
     input_data_t *start;
@@ -178,6 +179,9 @@ static int copy_to_buffer(buffer_desc_t *buf,
         break;
     }
 
+    err = pthread_cond_broadcast(&buf->cond);
+    assert(0 == err);
+
     err = pthread_mutex_unlock(&buf->lock);
     assert(0 == err);
 
@@ -188,36 +192,43 @@ static int write_buf_element(int fd,
                              buffer_desc_t *buf,
                              unsigned int channel_ids[],
                              unsigned int channel_count) {
+    struct timespec abs_timeout;
     int err, ret;
     input_data_t in;
 
     err = pthread_mutex_lock(&buf->lock);
     assert(0 == err);
 
-    if(buf->count > 0) {
-        in = *((input_data_t *)buf->start);
-        buf->count--;
-        buf->start++;
-
-        ret = -1;
-    } else {
-        ret = 0;
+    while(0 == buf->count && running) {
+        abs_wait_timeout(&abs_timeout);
+        err = pthread_cond_timedwait(&buf->cond, &buf->lock, &abs_timeout);
+        assert(0 == err || ETIMEDOUT == err);
     }
+
+    if(!running) {
+        err = pthread_mutex_unlock(&buf->lock);
+        assert(0 == err);
+        return 0;
+    }
+
+    assert(buf->count > 0);
+
+    in = *((input_data_t *)buf->start);
+    buf->count--;
+    buf->start++;
 
     err = pthread_mutex_unlock(&buf->lock);
     assert(0 == err);
 
-    if(0 != ret) {
-        ret = write_dataset(fd,
-                            channel_count,
-                            channel_ids,
-                            in.points_per_channel,
-                            in.timestamp_nanos,
-                            in.analog_data,
-                            in.digital_data);
-        free(in.analog_data);
-        free(in.digital_data);
-    }
+    ret = write_dataset(fd,
+                        channel_count,
+                        channel_ids,
+                        in.points_per_channel,
+                        in.timestamp_nanos,
+                        in.analog_data,
+                        in.digital_data);
+    free(in.analog_data);
+    free(in.digital_data);
 
     return ret;
 }
@@ -235,6 +246,9 @@ void free_buffer(buffer_desc_t *buf) {
     }
     free(buf->buffer);
     buf->buffer = NULL;
+
+    err = pthread_cond_broadcast(&buf->cond);
+    assert(0 == err);
 
     err = pthread_mutex_unlock(&buf->lock);
     assert(0 == err);
@@ -254,11 +268,8 @@ void *handler_sender_main(void *opaque_sender_info) {
                                 buffer_desc,
                                 sender_info->channels,
                                 sender_info->num_channels);
-        if(0 == err) {
-            /* buffer empty */
-            err = pthread_yield();
-            assert(0 == err);
-        } else if(0 > err) {
+        assert(0 != err || (0 == err && ! running));
+        if(0 > err) {
             /* ERROR */
             printf("Client %ld write failed: %s\n", pthread_self(), strerror(errno));
             break;
@@ -281,6 +292,7 @@ void *handler_thread_main(void *opaque_info) {
     volatile bool handler_running = true;
     buffer_desc_t buffer_desc = { .buffer = malloc(BUF_SIZE * sizeof(input_data_t))
                                 , .lock = PTHREAD_MUTEX_INITIALIZER
+                                , .cond = PTHREAD_COND_INITIALIZER
                                 , .count = 0
                                 , .max_elems = BUF_SIZE
                                 , .start = 0

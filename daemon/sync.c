@@ -64,24 +64,32 @@ void wait_read_barrier(void) {
 }
 
 void notify_read_barrier(void) {
-    int err = pthread_mutex_lock(&__mutex_read);
+    int err;
+
+    err = pthread_mutex_lock(&__mutex_read);
     assert(0 == err);
+
     __ready_handlers++;
-    pthread_cond_broadcast(&__cond_read);
+
+    err = pthread_cond_broadcast(&__cond_read);
+    assert(0 == err);
+
     err = pthread_mutex_unlock(&__mutex_read);
     assert(0 == err);
+
     printf("NOTIFIED READ BARRIER\n");
 }
 
 time_t wait_data_available(time_t last_data) {
     int err;
-    struct timespec timeout = WAIT_TIMEOUT;
+    struct timespec abs_timeout;
     time_t timer, data_at = 0;
     START_TIMING(timer);
     err = pthread_mutex_lock(&__mutex_data);
     assert(0 == err);
     while(running && last_data >= __data_available) {
-        err = pthread_cond_timedwait(&__cond_data, &__mutex_data, &timeout);
+        abs_wait_timeout(&abs_timeout);
+        err = pthread_cond_timedwait(&__cond_data, &__mutex_data, &abs_timeout);
         assert(0 == err || ETIMEDOUT == err);
     }
     data_at = __data_available;
@@ -93,37 +101,40 @@ time_t wait_data_available(time_t last_data) {
 }
 
 void notify_data_available(void) {
-    pthread_mutex_lock(&__mutex_data);
-    __data_available++;
-    pthread_mutex_unlock(&__mutex_data);
-}
-/*
-void notify_data_unavailable(void) {
-    int err;
     err = pthread_mutex_lock(&__mutex_data);
     assert(0 == err);
-    __data_available = 0;
+
+    __data_available++;
+
     err = pthread_mutex_unlock(&__mutex_data);
     assert(0 == err);
 }
-*/
+
 void inc_available_handlers(void) {
     int err;
+
     err = pthread_mutex_lock(&__mutex_handlers);
     assert(0 == err);
+
     __available_handlers++;
+
     err = pthread_mutex_unlock(&__mutex_handlers);
     assert(0 == err);
+
     notify_read_barrier();
 }
 
 void dec_available_handlers(void) {
     int err;
+
     err = pthread_mutex_lock(&__mutex_handlers);
     assert(0 == err);
+
     __available_handlers--;
+
     err = pthread_mutex_unlock(&__mutex_handlers);
     assert(0 == err);
+
     notify_read_barrier();
 }
 
@@ -143,10 +154,16 @@ unsigned int get_available_handlers(void) {
 }
 
 void reset_ready_handlers(void) {
-    int err = pthread_mutex_lock(&__mutex_read);
+    int err;
+
+    err = pthread_mutex_lock(&__mutex_read);
     assert(0 == err);
+
     __ready_handlers = 0;
-    pthread_cond_broadcast(&__cond_read);
+
+    err = pthread_cond_broadcast(&__cond_read);
+    assert(0 == err);
+
     err = pthread_mutex_unlock(&__mutex_read);
     assert(0 == err);
 }
