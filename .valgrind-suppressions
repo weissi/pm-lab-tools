@@ -1,0 +1,11 @@
+{
+   uninitialised bytes with protobufs
+   Memcheck:Param
+   write(buf)
+   obj:/lib/i386-linux-gnu/i686/cmov/libpthread-2.13.so
+   fun:write_dataset
+   fun:write_buf_element
+   fun:handler_sender_main
+   fun:start_thread
+   fun:clone
+}

@@ -1,0 +1,8 @@
+#!/bin/bash
+
+HERE=$(cd $(dirname "${BASH_SOURCE[0]}") > /dev/null && pwd)
+
+cd "$HERE"
+
+valgrind --max-stackframe=2880124 --suppressions=.valgrind-suppressions \
+    "$@" build/daemon
