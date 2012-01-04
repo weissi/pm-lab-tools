@@ -51,7 +51,9 @@
 #define LISTEN_QUEUE_LEN 8
 #define BUFFER_SAMPLES_PER_CHANNEL 30000
 
+#ifndef WITH_NI
 #include "test_data.h"
+#endif
 static const digival_t TEST_DIGITAL_DATA[240000] = { 0 };
 
 volatile bool running = true;
@@ -125,6 +127,7 @@ success:
     return dai;
 }
 
+#ifndef WITH_NI
 int read_dummy(void *handle, unsigned int sampling_rate,
                time_t timeout, int format, double *buffer,
                size_t data_size,
@@ -150,6 +153,7 @@ int read_dummy(void *handle, unsigned int sampling_rate,
 
     return 0;
 }
+#endif
 
 static int read_ni(data_acq_info_t *dai, const size_t data_size,
                    double *analog_data, unsigned int *points_pc_long) {
@@ -204,6 +208,7 @@ static void *ni_thread_main(void *opaque_info) {
         /* notify_data_unavailable(); */
         err = read_ni(h, data_size, analog_data, &points_pc);
         if (0 != err) {
+            running = false;
             break;
         }
         memcpy(digital_data, TEST_DIGITAL_DATA, 30 * sizeof(digival_t));

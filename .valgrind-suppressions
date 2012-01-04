@@ -9,3 +9,14 @@
    fun:start_thread
    fun:clone
 }
+{
+   uninitialised bytes with protobufs
+   Memcheck:Param
+   write(buf)
+   obj:/lib/libpthread-2.11.3.so
+   fun:write_dataset
+   fun:write_buf_element
+   fun:handler_sender_main
+   fun:start_thread
+   fun:clone
+}
