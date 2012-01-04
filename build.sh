@@ -2,7 +2,7 @@
 
 set -e
 
-HERE=$(cd $(dirname ${BASH_SOURCE[0]}) > /dev/null && pwd)
+HERE=$(cd $(dirname "${BASH_SOURCE[0]}") > /dev/null && pwd)
 cd "$HERE"
 
 rm build/*.o &> /dev/null || true
@@ -46,6 +46,9 @@ if [ "$#" -lt 1 -o "$1" = "client" ]; then
         compile_c ${f%*.c}
     done
     echo "- Linking pmlabclient"
+    if [ -f build/pmlabclient ]; then
+        rm build/pmlabclient
+    fi
     gcc $LDFLAGS -lprotobuf-c -o build/pmlabclient build/*.o
 fi
 
@@ -64,5 +67,8 @@ if [ "$#" -lt 1 -o "$1" = "daemon" ]; then
         compile_c ${f%*.c}
     done
     echo "- Linking deamon"
+    if [ -f build/daemon ]; then
+        rm build/daemon
+    fi
     gcc $LDFLAGS $NI_LDFLAGS -lprotobuf-c -lrt -lpthread -o build/daemon build/*.o
 fi
