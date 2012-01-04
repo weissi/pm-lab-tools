@@ -228,7 +228,7 @@ static void wait_for_connections(input_data_t *data_info) {
     if(0 != err) {
         close(server_sock);
         printf("ERROR: bind: %s\n", strerror(errno));
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 
     err = listen(server_sock, LISTEN_QUEUE_LEN);

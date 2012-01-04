@@ -9,6 +9,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <arpa/inet.h>
+#include <strings.h>
 
 #include <utils.h>
 
@@ -18,6 +19,7 @@
 #include "measured-data.pb-c.h"
 
 #define BUF_SIZE 256
+#define MAX_CHANNELS 8
 
 typedef struct {
     pthread_mutex_t lock;
@@ -87,7 +89,7 @@ static int write_dataset(int fd,
     const uint32_t net_msg_len = htonl(msg_len);
     void *buf = malloc(msg_len);
     assert(NULL != buf);
-    memset(buf, msg_len, 0);
+    bzero(buf, msg_len);
 
     data_set__pack(&msg_ds, buf);
 
@@ -289,8 +291,9 @@ void *handler_thread_main(void *opaque_info) {
 
     /* read channel information */
     err = read(info->fd, &net_nc, sizeof(uint32_t));
-    assert(sizeof(uint32_t) == err);
+    assert(sizeof(net_nc) == err);
     num_channels = ntohl(net_nc);
+    assert(num_channels <= MAX_CHANNELS);
 
     net_channels = alloca(sizeof(uint32_t)*num_channels);
     channels = alloca(sizeof(uint32_t)*num_channels);
@@ -298,6 +301,7 @@ void *handler_thread_main(void *opaque_info) {
     assert(sizeof(uint32_t)*num_channels == err);
     for(i = 0; i < num_channels; i++) {
         channels[i] = ntohl(net_channels[i]);
+        assert(channels[i] < info->data_info->num_channels);
     }
 
     sender_info.buffer_desc = &buffer_desc;
@@ -305,12 +309,6 @@ void *handler_thread_main(void *opaque_info) {
     sender_info.conn_fd = info->fd;
     sender_info.num_channels = num_channels;
     sender_info.channels = channels;
-    /*= { .buffer_desc = &buffer_desc
-                  , .handler_running = &handler_running
-                  , .conn_fd = info->fd
-                  , .num_channels = num_channels
-                  , .channels = channels
-                  };*/
 
     err = pthread_create(&sender_thread, NULL, handler_sender_main, &sender_info);
     assert(0 == err);
