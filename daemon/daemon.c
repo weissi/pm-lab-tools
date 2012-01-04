@@ -208,6 +208,7 @@ static void *ni_thread_main(void *opaque_info) {
         /* notify_data_unavailable(); */
         err = read_ni(h, data_size, analog_data, &points_pc);
         if (0 != err) {
+            running = false;
             break;
         }
         memcpy(digital_data, TEST_DIGITAL_DATA, 30 * sizeof(digival_t));
