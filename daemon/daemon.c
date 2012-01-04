@@ -111,7 +111,7 @@ int read_dummy(void *handle, unsigned int sampling_rate,
                size_t data_size,
                unsigned int *points_per_channel,
                void *unused) {
-    struct timespec t_start;
+    static struct timespec t_next = { 0 };
 
     assert(NULL == handle);
     assert(30000 == sampling_rate);
@@ -121,10 +121,14 @@ int read_dummy(void *handle, unsigned int sampling_rate,
     *points_per_channel = 30000;
     (void)unused;
 
-    clock_gettime(CLOCK_REALTIME, &t_start);
+    if(0 == t_next.tv_sec) {
+        clock_gettime(CLOCK_REALTIME, &t_next);
+    }
+
     memcpy(buffer, TEST_ANALOG_DATA, 30 * sizeof(double));
-    t_start.tv_sec += 1;
-    clock_nanosleep(CLOCK_REALTIME, TIMER_ABSTIME, &t_start, NULL);
+    t_next.tv_sec += 1;
+    clock_nanosleep(CLOCK_REALTIME, TIMER_ABSTIME, &t_next, NULL);
+
     return 0;
 }
 
