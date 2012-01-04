@@ -36,13 +36,6 @@
 
 #ifdef WITH_NI
 #include <NIDAQmxBase.h>
-#define \
-    CHK(functionCall) { \
-        printf("NI call...\n"); fflush(stdout); \
-        if( DAQmxFailed(ni_errno=(functionCall)) ) { \
-            finish_ni(h); \
-        } \
-    }
 #endif
 
 #include <assert.h>
@@ -63,39 +56,61 @@
 #endif
 static const digival_t TEST_DIGITAL_DATA[240000] = { 0 };
 
-#ifdef WITH_NI
-volatile int32 ni_errno = 0;
-#endif
-
 volatile bool running = true;
 static void sig_hnd() {
     printf("Ctrl+C caught, exiting...\n");
     running = false;
 }
 
-static void finish_ni(void *task_handle_opaque) {
-#ifdef WITH_NI
-    TaskHandle *h = (TaskHandle *)task_handle_opaque;
-    char errBuff[2048] = { 0 };
+typedef struct {
+    void *opaque_task_handle;
+    void *opaque_error;
+    bool failed;
+} data_acq_info_t;
 
-    if( DAQmxFailed(ni_errno) )
+static void finish_ni(data_acq_info_t *dai) {
+#ifdef WITH_NI
+    TaskHandle *h = (TaskHandle *)dai->opaque_task_handle;
+    char errBuff[2048] = { 0 };
+    int32 ni_errno = *((int32 *)dai->opaque_error);
+
+    if(DAQmxFailed(ni_errno)) {
         DAQmxBaseGetExtendedErrorInfo(errBuff, 2048);
+    }
+
     if(h != 0) {
         DAQmxBaseStopTask (*h);
         DAQmxBaseClearTask (*h);
     }
+
     if( DAQmxFailed(ni_errno) ) {
         printf ("DAQmxBase Error %d %s\n", (int)ni_errno, errBuff);
     }
-    free(task_handle_opaque);
+
+    free(dai->opaque_task_handle);
+    free(dai->opaque_error);
+    free(dai);
 #endif
 }
 
-static void *init_ni(void) {
-    void *task_handle_opaque = NULL;
+#define \
+    CHK(functionCall) { \
+        printf("NI call...\n"); fflush(stdout); \
+        if( DAQmxFailed(*((int32 *)dai->opaque_error)=(functionCall)) ) { \
+            goto err; \
+        } \
+    }
+static data_acq_info_t *init_ni(void) {
+    data_acq_info_t *dai = malloc(sizeof *dai);
+    dai->failed = false;
 #ifdef WITH_NI
     TaskHandle *h = malloc(sizeof *h);
     assert(NULL != h);
+
+    dai->opaque_task_handle = h;
+    dai->opaque_error = malloc(sizeof(int32));
+    assert(NULL != dai->opaque_error);
+
     CHK(DAQmxBaseCreateTask("analog-inputs", h));
     CHK(DAQmxBaseCreateAIVoltageChan(*h, ni_channels, NULL, DAQmx_Val_Diff,
                                      U_MIN, U_MAX, DAQmx_Val_Volts, NULL));
@@ -103,9 +118,13 @@ static void *init_ni(void) {
                                   DAQmx_Val_Rising, DAQmx_Val_ContSamps,
                                   0));
     CHK(DAQmxBaseStartTask(*h));
-    task_handle_opaque = h;
+    goto success;
+err:
+    dai->failed = true;
+    return dai;
+success:
 #endif
-    return task_handle_opaque;
+    return dai;
 }
 
 #ifndef WITH_NI
@@ -136,24 +155,40 @@ int read_dummy(void *handle, unsigned int sampling_rate,
 }
 #endif
 
-static void read_ni(void *opaque_task_handle, const size_t data_size,
-                    double *analog_data, unsigned int *points_pc_long) {
+static int read_ni(data_acq_info_t *dai, const size_t data_size,
+                   double *analog_data, unsigned int *points_pc_long) {
 #ifdef WITH_NI
     int32 points_pc = 0;
-    TaskHandle *h = (TaskHandle *)opaque_task_handle;
-    CHK(DAQmxBaseReadAnalogF64(*h, SAMPLING_RATE, TIMEOUT,
-                               DAQmx_Val_GroupByChannel, analog_data,
-                               data_size, &points_pc, NULL));
+    TaskHandle *h = (TaskHandle *)dai->opaque_task_handle;
+    if(dai->failed) {
+        return EIO;
+    }
+    *((int32 *)dai->opaque_error) =
+        DAQmxBaseReadAnalogF64(*h,
+                               SAMPLING_RATE,
+                               TIMEOUT,
+                               DAQmx_Val_GroupByChannel,
+                               analog_data,
+                               data_size,
+                               &points_pc,
+                               NULL);
+    if(DAQmxFailed(*((int32 *)dai->opaque_error))) {
+        dai->failed = true;
+        return EIO;
+    }
     *points_pc_long = points_pc;
+    return 0;
 #endif
 #ifndef WITH_NI
-    read_dummy(opaque_task_handle, SAMPLING_RATE, TIMEOUT,
+    read_dummy(dai, SAMPLING_RATE, TIMEOUT,
                DAQmx_Val_GroupByChannel, analog_data,
                data_size, points_pc_long, NULL);
+    return 0;
 #endif
 }
 
 static void *ni_thread_main(void *opaque_info) {
+    int err;
     input_data_t *info = (input_data_t *)opaque_info;
     unsigned int points_pc;
     const unsigned int num_channels = 8;
@@ -162,7 +197,7 @@ static void *ni_thread_main(void *opaque_info) {
     digival_t digital_data[data_size];
     (void)digital_data;
     uint64_t timestamp = 0;
-    void *h = init_ni();
+    data_acq_info_t *h = init_ni();
 
     while(running) {
         wait_read_barrier();
@@ -171,7 +206,10 @@ static void *ni_thread_main(void *opaque_info) {
         }
         reset_ready_handlers();
         /* notify_data_unavailable(); */
-        read_ni(h, data_size, analog_data, &points_pc);
+        err = read_ni(h, data_size, analog_data, &points_pc);
+        if (0 != err) {
+            break;
+        }
         memcpy(digital_data, TEST_DIGITAL_DATA, 30 * sizeof(digival_t));
         /*
         for i = 1 to n:
