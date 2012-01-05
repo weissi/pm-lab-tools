@@ -272,7 +272,8 @@ void *handler_sender_main(void *opaque_sender_info) {
             /* everything okay */
         } else if(err < 0) {
             /* ERROR */
-            printf("Client %ld write failed: %s\n", pthread_self(), strerror(errno));
+            printf("Client %ld write failed: %s\n", (long int)pthread_self(),
+                   strerror(errno));
             break;
         } else {
             assert(0 == err);
@@ -353,10 +354,12 @@ void *handler_thread_main(void *opaque_info) {
                (buffer_desc.start-buffer_desc.buffer));
         notify_read_barrier();
 
+#ifndef __MACH__
         err = pthread_tryjoin_np(sender_thread, NULL);
         if(EBUSY != err) {
             break;
         }
+#endif
     }
     dec_available_handlers();
     handler_running = false;

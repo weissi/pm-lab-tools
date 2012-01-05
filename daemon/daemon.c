@@ -133,7 +133,9 @@ int read_dummy(void *handle, unsigned int sampling_rate,
                size_t data_size,
                unsigned int *points_per_channel,
                void *unused) {
+#ifndef __MACH__
     static struct timespec t_next = { 0 };
+#endif
 
     assert(NULL == handle);
     assert(30000 == sampling_rate);
@@ -143,13 +145,16 @@ int read_dummy(void *handle, unsigned int sampling_rate,
     *points_per_channel = 30000;
     (void)unused;
 
+#ifndef __MACH__
     if(0 == t_next.tv_sec) {
         clock_gettime(CLOCK_REALTIME, &t_next);
     }
-
+#endif
     memcpy(buffer, TEST_ANALOG_DATA, 30 * sizeof(double));
+#ifndef __MACH__
     t_next.tv_sec += 1;
     clock_nanosleep(CLOCK_REALTIME, TIMER_ABSTIME, &t_next, NULL);
+#endif
 
     return 0;
 }
@@ -254,7 +259,9 @@ static void wait_for_connections(input_data_t *data_info) {
     int conn;
     struct pollfd poll_cfg;
     int sock_opt;
+#ifndef __MACH__
     struct timespec timeout = WAIT_TIMEOUT;
+#endif
     const int server_sock = socket(AF_INET, SOCK_STREAM, 0);
     assert(0 <= server_sock);
 
@@ -281,7 +288,11 @@ static void wait_for_connections(input_data_t *data_info) {
     poll_cfg.events = POLLIN;
 
     while(running) {
+#ifndef __MACH__
         err = ppoll(&poll_cfg, 1, &timeout, NULL);
+#else
+        err = poll(&poll_cfg, 1, 1);
+#endif
         if (0 == err || (-1 == err && EINTR == errno)) {
             continue;
         }

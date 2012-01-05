@@ -7,6 +7,7 @@
 #include <assert.h>
 #include <string.h>
 #include <errno.h>
+#include <sys/time.h>
 
 #include "common.h"
 #include "daemon.h"
@@ -14,7 +15,7 @@
 
 #define START_TIMING(t) (t) = time(NULL)
 #define STOP_TIMING(t) (t) = (time(NULL) - (t))
-#define PRINT_TIMING(t,n) printf("[%ld] "n": %lds\n", pthread_self(), (long int)(t))
+#define PRINT_TIMING(t,n) printf("[%ld] "n": %lds\n", (long int)pthread_self(), (long int)(t))
 
 static pthread_mutex_t __mutex_read = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t __cond_read = PTHREAD_COND_INITIALIZER;
@@ -26,6 +27,7 @@ static unsigned int __ready_handlers = 0;
 static unsigned int __available_handlers = 0;
 
 void abs_wait_timeout(struct timespec *abs_timeout) {
+#ifndef __MACH__
     struct timespec wait_timeout = WAIT_TIMEOUT;
     int err = clock_gettime(CLOCK_REALTIME, abs_timeout);
     assert(0 == err);
@@ -38,6 +40,14 @@ void abs_wait_timeout(struct timespec *abs_timeout) {
         abs_timeout->tv_sec += wait_timeout.tv_sec;
         abs_timeout->tv_nsec += wait_timeout.tv_nsec;
     }
+#else
+    struct timeval tv;
+    struct timespec ts;
+    gettimeofday(&tv, NULL);
+    ts.tv_sec = tv.tv_sec + 1;
+    ts.tv_nsec = 0;
+    *abs_timeout = ts;
+#endif
 }
 
 void wait_read_barrier(void) {

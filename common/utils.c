@@ -23,7 +23,6 @@ ssize_t full_write(int fd, const char *buf, size_t count) {
 
         size-=res;
         buf+=res;
-        printf("partial write (count = %u, res = %d)\n", count, res);
     }
 
     return count;

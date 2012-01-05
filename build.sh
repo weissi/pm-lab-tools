@@ -19,9 +19,17 @@ fi
 CFLAGS="$CFLAGS $NI_CFLAGS -I$HERE -ggdb"
 LDFLAGS="$LDFLAGS -ggdb"
 
+if [ "$(uname -s)" != "Darwin" ]; then
+    LDFLAGS="$LDFLAGS -lrt"
+fi
+
 function compile_c() {
     echo "- Compiling $1.c"
-    gcc -std=gnu99 -Wall -Werror -pedantic -lrt -lpthread -c $CFLAGS \
+    ALDF="-lpthread"
+    if [ "$(uname -s)" = "Darwin" ]; then
+        ALDF=""
+    fi
+    gcc -std=gnu99 -Wall -Werror -pedantic $ALDF -c $CFLAGS \
         -Idaemon -Icommon -Igensrc -o "build/$(basename $1).o" $1.c
 }
 
@@ -70,5 +78,5 @@ if [ "$#" -lt 1 -o "$1" = "daemon" ]; then
     if [ -f build/daemon ]; then
         rm build/daemon
     fi
-    gcc $LDFLAGS $NI_LDFLAGS -lprotobuf-c -lrt -lpthread -o build/daemon build/*.o
+    gcc $LDFLAGS $NI_LDFLAGS -lprotobuf-c -lpthread -o build/daemon build/*.o
 fi
