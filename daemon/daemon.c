@@ -112,7 +112,7 @@ static data_acq_info_t *init_ni(void) {
     assert(NULL != dai->opaque_error);
 
     CHK(DAQmxBaseCreateTask("analog-inputs", h));
-    CHK(DAQmxBaseCreateAIVoltageChan(*h, ni_channels, NULL, DAQmx_Val_Diff,
+    CHK(DAQmxBaseCreateAIVoltageChan(*h, NI_CHANNELS, NULL, DAQmx_Val_Diff,
                                      U_MIN, U_MAX, DAQmx_Val_Volts, NULL));
     CHK(DAQmxBaseCfgSampClkTiming(*h, CLK_SRC, SAMPLING_RATE,
                                   DAQmx_Val_Rising, DAQmx_Val_ContSamps,
@@ -142,7 +142,7 @@ int read_dummy(void *handle, unsigned int sampling_rate,
     (void)timeout;
     assert(DAQmx_Val_GroupByChannel == format);
     assert(sizeof(TEST_ANALOG_DATA)/sizeof(double) <= data_size);
-    *points_per_channel = 30000;
+    *points_per_channel = sizeof(TEST_ANALOG_DATA)/sizeof(double)/8;
     (void)unused;
 
 #ifndef __MACH__
@@ -150,7 +150,7 @@ int read_dummy(void *handle, unsigned int sampling_rate,
         clock_gettime(CLOCK_REALTIME, &t_next);
     }
 #endif
-    memcpy(buffer, TEST_ANALOG_DATA, 30 * sizeof(double));
+    memcpy(buffer, TEST_ANALOG_DATA, sizeof(TEST_ANALOG_DATA));
 #ifndef __MACH__
     t_next.tv_sec += 1;
     clock_nanosleep(CLOCK_REALTIME, TIMER_ABSTIME, &t_next, NULL);
@@ -183,8 +183,7 @@ static int read_ni(data_acq_info_t *dai, const size_t data_size,
     }
     *points_pc_long = points_pc;
     return 0;
-#endif
-#ifndef WITH_NI
+#else
     read_dummy(dai->opaque_task_handle, SAMPLING_RATE, TIMEOUT,
                DAQmx_Val_GroupByChannel, analog_data,
                data_size, points_pc_long, NULL);
@@ -216,7 +215,7 @@ static void *ni_thread_main(void *opaque_info) {
             running = false;
             break;
         }
-        memcpy(digital_data, TEST_DIGITAL_DATA, 30 * sizeof(digival_t));
+        memcpy(digital_data, TEST_DIGITAL_DATA, num_channels * points_pc * sizeof(digival_t));
         /*
         for i = 1 to n:
             check_trigger_signal(i)

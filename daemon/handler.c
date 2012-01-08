@@ -15,6 +15,7 @@
 
 #include "daemon.h"
 #include "sync.h"
+#include "common/conf.h"
 
 #include "measured-data.pb-c.h"
 
@@ -288,6 +289,7 @@ void *handler_thread_main(void *opaque_info) {
     handler_thread_info_t *info = (handler_thread_info_t *)opaque_info;
     int err, i;
     uint32_t net_nc, num_channels;
+    uint32_t net_sampling_rate;
     uint32_t *net_channels;
     uint32_t *channels;
     time_t last_data = 0;
@@ -332,6 +334,10 @@ void *handler_thread_main(void *opaque_info) {
     inc_available_handlers();
     err = full_write(info->fd, WELCOME_MSG, sizeof(WELCOME_MSG));
     assert(sizeof(WELCOME_MSG) == err);
+
+    net_sampling_rate = htonl((uint32_t)SAMPLING_RATE);
+    err = full_write(info->fd, (char *)&net_sampling_rate, sizeof(uint32_t));
+    assert(sizeof(uint32_t) == err);
 
     while(running) {
         last_data = wait_data_available(last_data);

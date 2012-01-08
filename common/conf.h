@@ -12,7 +12,7 @@ enum channel_ids {
     CHAN8 = 7
 };
 
-const char *ni_channels = "Dev1/ai0, Dev1/ai1, Dev1/ai2, Dev1/ai3,"
+#define NI_CHANNELS "Dev1/ai0, Dev1/ai1, Dev1/ai2, Dev1/ai3," \
     "Dev1/ai4, Dev1/ai5, Dev1/ai6, Dev1/ai7";
 #define U_MIN ((double)-0.2)
 #define U_MAX ((double)0.2)
