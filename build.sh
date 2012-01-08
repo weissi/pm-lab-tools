@@ -49,13 +49,14 @@ if [ "$#" -lt 1 -o "$1" = "client" ]; then
     echo
     echo "Building Client"
 
+    compile_c client/libpmlab
     compile_c client/pmlabclient
     for f in gensrc/*.c; do
         compile_c ${f%*.c}
     done
     echo "- Linking pmlabclient"
-    if [ -f build/pmlabclient ]; then
-        rm build/pmlabclient
+    if [ -f build/libpmlab ]; then
+        rm build/libpmlab
     fi
     gcc $LDFLAGS -lprotobuf-c -o build/pmlabclient build/*.o
 fi
