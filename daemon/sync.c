@@ -8,6 +8,8 @@
 #include <string.h>
 #include <errno.h>
 #include <sys/time.h>
+#include <inttypes.h>
+#include <stdlib.h>
 
 #include "common.h"
 #include "daemon.h"
@@ -22,7 +24,7 @@ static pthread_cond_t __cond_read = PTHREAD_COND_INITIALIZER;
 static pthread_mutex_t __mutex_data = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t __cond_data = PTHREAD_COND_INITIALIZER;
 static pthread_mutex_t __mutex_handlers = PTHREAD_MUTEX_INITIALIZER;
-static unsigned int __data_available = 0;
+static uint64_t __data_available = 0;
 static unsigned int __ready_handlers = 0;
 static unsigned int __available_handlers = 0;
 
@@ -90,10 +92,36 @@ void notify_read_barrier(void) {
     printf("NOTIFIED READ BARRIER\n");
 }
 
-time_t wait_data_available(time_t last_data) {
+void set_ready(uint64_t da) {
+    int err;
+
+    printf("Thread %ld: READY\n", (long int)pthread_self());
+
+    err = pthread_mutex_lock(&__mutex_read);
+    assert(0 == err);
+
+    if(da != __data_available) {
+        printf("Sending ready for %"PRIu64", but expected %"PRIu64"\n", da, __data_available);
+        if(0 != da) {
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    assert(__ready_handlers < get_available_handlers());
+
+    __ready_handlers++;
+
+    err = pthread_mutex_unlock(&__mutex_read);
+    assert(0 == err);
+
+    notify_read_barrier();
+}
+
+uint64_t wait_data_available(uint64_t last_data) {
     int err;
     struct timespec abs_timeout;
-    time_t timer, data_at = 0;
+    time_t timer;
+    uint64_t data_at = 0;
     START_TIMING(timer);
     err = pthread_mutex_lock(&__mutex_data);
     assert(0 == err);
@@ -110,13 +138,15 @@ time_t wait_data_available(time_t last_data) {
     return data_at;
 }
 
-void notify_data_available(void) {
+void notify_data_available(uint64_t da) {
     int err;
 
     err = pthread_mutex_lock(&__mutex_data);
     assert(0 == err);
 
-    __data_available++;
+    assert(da > __data_available);
+
+    __data_available = da;
 
     err = pthread_mutex_unlock(&__mutex_data);
     assert(0 == err);

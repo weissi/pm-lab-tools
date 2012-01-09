@@ -220,11 +220,14 @@ static void *ni_thread_main(void *opaque_info) {
             running = false;
             break;
         }
-        memcpy(digital_data, TEST_DIGITAL_DATA, num_channels * points_pc * sizeof(digival_t));
-        /*
-        for i = 1 to n:
-            check_trigger_signal(i)
-            */
+        memcpy(digital_data,
+               TEST_DIGITAL_DATA,
+               num_channels * points_pc * sizeof(digival_t));
+
+        timestamp += ((uint64_t)TIME_S) *
+                     ((uint64_t)points_pc) /
+                     ((uint64_t)SAMPLING_RATE);
+
         err = pthread_mutex_lock(&info->lock);
         assert(0 == err);
         info->timestamp_nanos = timestamp;
@@ -232,12 +235,11 @@ static void *ni_thread_main(void *opaque_info) {
         info->num_channels = num_channels;
         info->analog_data = analog_data;
         info->digital_data = digital_data;
-        timestamp += ((uint64_t)TIME_S) * ((uint64_t)points_pc) / ((uint64_t)SAMPLING_RATE);
         err = pthread_mutex_unlock(&info->lock);
         assert(0 == err);
 
         printf("NI: read successful, ts = %"PRIu64"\n", timestamp);
-        notify_data_available();
+        notify_data_available(timestamp);
     }
 
     finish_ni(h);

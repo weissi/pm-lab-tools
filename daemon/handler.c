@@ -296,9 +296,11 @@ void *handler_thread_main(void *opaque_info) {
     uint32_t net_sampling_rate;
     uint32_t *net_channels;
     uint32_t *channels;
-    time_t last_data = 0;
+    uint64_t last_data = 0;
     pthread_t sender_thread;
     volatile bool handler_running = true;
+    bool end_thread = false;
+    bool skip_read;
     buffer_desc_t buffer_desc = { .buffer = malloc(BUF_SIZE * sizeof(input_data_t))
                                 , .lock = PTHREAD_MUTEX_INITIALIZER
                                 , .cond = PTHREAD_COND_INITIALIZER
@@ -344,30 +346,34 @@ void *handler_thread_main(void *opaque_info) {
     assert(sizeof(uint32_t) == err);
 
     while(running) {
+        skip_read = 0 == last_data;
         last_data = wait_data_available(last_data);
-        if(!running) {
+        if(!running || end_thread) {
             break;
         }
 
-        input_data_t *data_info = info->data_info;
-        err = copy_to_buffer(&buffer_desc, data_info);
-        if(ENOBUFS == err) {
-            /* out of buffer space */
-            break;
+        if(!skip_read) {
+            input_data_t *data_info = info->data_info;
+            err = copy_to_buffer(&buffer_desc, data_info);
+            if(ENOBUFS == err) {
+                /* out of buffer space */
+                break;
+            }
+            assert(0 == err);
+            printf("Buffer %p has now %zu/%zu element(s) starting at %p (offset = %zu)\n",
+                   (void *)buffer_desc.buffer,
+                   buffer_desc.count,
+                   buffer_desc.max_elems,
+                   (void *)buffer_desc.start,
+                   (buffer_desc.start-buffer_desc.buffer));
         }
-        assert(0 == err);
-        printf("Buffer %p has now %zu/%zu element(s) starting at %p (offset = %zu)\n",
-               (void *)buffer_desc.buffer,
-               buffer_desc.count,
-               buffer_desc.max_elems,
-               (void *)buffer_desc.start,
-               (buffer_desc.start-buffer_desc.buffer));
-        notify_read_barrier();
+        set_ready(skip_read ? 0 : last_data);
 
 #ifndef __MACH__
         err = pthread_tryjoin_np(sender_thread, NULL);
         if(EBUSY != err) {
-            break;
+            /* delay end of thread because we're seen as "ready thread" */
+            end_thread = true;
         }
 #endif
     }

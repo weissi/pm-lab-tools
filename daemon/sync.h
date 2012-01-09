@@ -12,11 +12,10 @@ void abs_wait_timeout(struct timespec *abs_timeout);
 
 void wait_read_barrier(void);
 void notify_read_barrier(void);
-void notify_data_available(void);
-void notify_data_unavailable(void);
 
-time_t wait_data_available(time_t last_data);
-void notify_data_available(void);
+uint64_t wait_data_available(uint64_t last_data);
+void notify_data_available(uint64_t new_da);
+void set_ready(uint64_t da);
 
 void inc_available_handlers(void);
 void dec_available_handlers(void);
