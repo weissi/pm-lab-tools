@@ -199,11 +199,12 @@ static void *ni_thread_main(void *opaque_info) {
     unsigned int points_pc;
     const unsigned int num_channels = 8;
     const size_t data_size = BUFFER_SAMPLES_PER_CHANNEL * num_channels;
-    double analog_data[data_size];
-    digival_t digital_data[data_size];
-    (void)digital_data;
     uint64_t timestamp = 0;
     data_acq_info_t *h = init_ni();
+    double *analog_data = malloc(data_size * sizeof(*analog_data));
+    assert(NULL != analog_data);
+    digival_t *digital_data = malloc(data_size * sizeof(*digital_data));
+    assert(NULL != digital_data);
 
     while(running) {
         wait_read_barrier();
@@ -233,6 +234,8 @@ static void *ni_thread_main(void *opaque_info) {
     }
 
     finish_ni(h);
+    free(analog_data);
+    free(digital_data);
     return NULL;
 }
 
