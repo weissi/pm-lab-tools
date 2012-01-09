@@ -116,21 +116,34 @@ int pm_read(void *h,
     int i;
     unsigned int offset;
     DataSet *msg_ds;
+    ssize_t ret = 0;
 
     handle = (pm_handle *)h;
     assert(PM_HANDLE_MAGIC_NUMBER == handle->magic_number);
 
     err = full_read(handle->sockfd, magic_data_buffer, sizeof(MAGIC_DATA_SET));
+    if(0 == err) {
+        return 0;
+    }
     assert(sizeof(MAGIC_DATA_SET)==err);
+    ret += err;
     assert(0==strncmp(MAGIC_DATA_SET, magic_data_buffer, sizeof(MAGIC_DATA_SET)));
 
     err = full_read(handle->sockfd, (char *)&net_msg_len, sizeof(uint32_t));
+    if(0 == err) {
+        return 0;
+    }
     assert(sizeof(uint32_t)==err);
+    ret += err;
     msg_len = ntohl(net_msg_len);
 
     msg_buffer = malloc(msg_len);
     err = full_read(handle->sockfd, msg_buffer, msg_len);
+    if(0 == err) {
+        return 0;
+    }
     assert(msg_len==err);
+    ret += err;
 
     msg_ds = data_set__unpack(NULL, msg_len, msg_buffer);
     free(msg_buffer);
@@ -156,7 +169,7 @@ int pm_read(void *h,
 
     data_set__free_unpacked(msg_ds, NULL);
 
-    return 0;
+    return ret;
 }
 
 void pm_close(void *h) {

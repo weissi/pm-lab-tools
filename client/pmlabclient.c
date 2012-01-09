@@ -52,14 +52,20 @@ int main(int argc, char *argv[])
                           digital_data,
                           &sample_count,
                           &timestamp);
-        if (err < 0) {
+        if (0 == err) {
+            pm_close(pm_handle);
+            fprintf(stderr, "Server closed connection.\n");
+            exit(EXIT_FAILURE);
+        } else if (err < 0) {
             pm_close(pm_handle);
             fprintf(stderr, "Error reading from network!");
             exit(EXIT_FAILURE);
         }
+
         /* output data to stdout */
         for (i = 0; i < sample_count; i++) {
-            double ts = (double)timestamp/1000000000L + (i/(double)sampling_rate);
+            const double ts = (double)timestamp/1000000000L +
+                              (i/(double)sampling_rate);
             printf("%f", ts);
             for (j = 0; j < num_channels; j++) {
                 printf(" %f", analog_data[i+j*sample_count]);

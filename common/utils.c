@@ -41,6 +41,11 @@ ssize_t full_read(int fd, const char *buf, size_t count) {
             return res;
         }
 
+        if(0 == res) {
+            /* EOF */
+            return 0;
+        }
+
         size-=res;
         buf+=res;
     }
