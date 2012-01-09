@@ -203,21 +203,6 @@ void dec_available_handlers(void) {
     notify_read_barrier();
 }
 
-unsigned int get_available_handlers(void) {
-    int err;
-    unsigned int handlers;
-
-    err = pthread_mutex_lock(&__mutex_handlers);
-    assert(0 == err);
-
-    handlers = __available_handlers;
-
-    err = pthread_mutex_unlock(&__mutex_handlers);
-    assert(0 == err);
-
-    return handlers;
-}
-
 void reset_ready_handlers(void) {
     int err;
 
