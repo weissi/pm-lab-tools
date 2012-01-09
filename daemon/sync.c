@@ -148,6 +148,10 @@ uint64_t wait_data_available(uint64_t last_data) {
         abs_wait_timeout(&abs_timeout);
         err = pthread_cond_timedwait(&__cond_data, &__mutex_data, &abs_timeout);
         assert(0 == err || ETIMEDOUT == err);
+        printf("wait_data_available: %s (av handlers: %u, rd handlers: %u)\n",
+               strerror(err),
+               get_available_handlers(),
+               __ready_handlers);
     }
     data_at = __data_available;
     err = pthread_mutex_unlock(&__mutex_data);
