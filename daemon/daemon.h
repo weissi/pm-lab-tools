@@ -8,6 +8,7 @@
 extern volatile bool running;
 
 typedef struct {
+    pthread_mutex_t lock;
     uint64_t timestamp_nanos;
     unsigned int points_per_channel;
     unsigned int num_channels;

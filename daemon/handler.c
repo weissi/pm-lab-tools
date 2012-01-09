@@ -145,7 +145,11 @@ static int copy_to_buffer(buffer_desc_t *buf,
             unsigned int samples = in->num_channels * in->points_per_channel;
             input_data_t *dest = buf->start + buf->count;
 
+            err = pthread_mutex_lock(&in->lock);
+            assert(0 == err);
             *dest = *in;
+            err = pthread_mutex_unlock(&in->lock);
+            assert(0 == err);
 
             /* copy analog data */
             dest->analog_data = malloc(samples * sizeof(double));

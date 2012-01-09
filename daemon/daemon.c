@@ -34,6 +34,7 @@
 #include <sys/socket.h>
 #include <inttypes.h>
 #include <netinet/tcp.h>
+#include <pthread.h>
 
 #ifdef WITH_NI
 #include <NIDAQmxBase.h>
@@ -205,6 +206,7 @@ static void *ni_thread_main(void *opaque_info) {
     assert(NULL != analog_data);
     digival_t *digital_data = malloc(data_size * sizeof(*digital_data));
     assert(NULL != digital_data);
+    info->lock = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
 
     while(running) {
         wait_read_barrier();
@@ -223,12 +225,17 @@ static void *ni_thread_main(void *opaque_info) {
         for i = 1 to n:
             check_trigger_signal(i)
             */
+        err = pthread_mutex_lock(&info->lock);
+        assert(0 == err);
         info->timestamp_nanos = timestamp;
         info->points_per_channel = points_pc;
         info->num_channels = num_channels;
         info->analog_data = analog_data;
         info->digital_data = digital_data;
         timestamp += ((uint64_t)TIME_S) * ((uint64_t)points_pc) / ((uint64_t)SAMPLING_RATE);
+        err = pthread_mutex_unlock(&info->lock);
+        assert(0 == err);
+
         printf("NI: read successful, ts = %"PRIu64"\n", timestamp);
         notify_data_available();
     }
