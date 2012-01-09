@@ -33,6 +33,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <inttypes.h>
+#include <netinet/tcp.h>
 
 #ifdef WITH_NI
 #include <NIDAQmxBase.h>
@@ -265,7 +266,11 @@ static void wait_for_connections(input_data_t *data_info) {
     assert(0 <= server_sock);
 
     sock_opt = 1;
-    setsockopt(server_sock, SOL_SOCKET, SO_REUSEADDR, &sock_opt, sizeof(sock_opt));
+    err = setsockopt(server_sock, SOL_SOCKET, SO_REUSEADDR, &sock_opt, sizeof(sock_opt));
+    assert(0 == err);
+    sock_opt = 1;
+    err = setsockopt(server_sock, IPPROTO_TCP, TCP_NODELAY, &sock_opt, sizeof(int));
+    assert(0 == err);
 
     memset(&servaddr, 0, sizeof(servaddr));
     servaddr.sin_family = AF_INET;
