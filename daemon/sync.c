@@ -75,28 +75,32 @@ void wait_read_barrier(void) {
     START_TIMING(timer);
     err = pthread_mutex_lock(&__mutex_read);
     assert(0 == err);
+        printf("WAIT_READ_BARRIER: START (av handlers: %u, rd handlers: %u)\n",
+               get_available_handlers(),
+               __ready_handlers);
     while(running && __ready_handlers < get_available_handlers()) {
         abs_wait_timeout(&abs_timeout);
         err = pthread_cond_timedwait(&__cond_read, &__mutex_read, &abs_timeout);
         assert(0 == err || ETIMEDOUT == err);
-        printf("pthread_cond_timedwait: %s (av handlers: %u, rd handlers: %u)\n",
+        printf("wait_read_barrier: %s (av handlers: %u, rd handlers: %u)\n",
                strerror(err),
-               __available_handlers,
+               get_available_handlers(),
                __ready_handlers);
     }
+    assert(!running || __ready_handlers <= get_available_handlers());
     err = pthread_mutex_unlock(&__mutex_read);
     assert(0 == err);
     STOP_TIMING(timer);
-    //PRINT_TIMING(timer, "wait_read_barrier");
+    PRINT_TIMING(timer, "wait_read_barrier");
 }
 
 void notify_read_barrier(void) {
     int err;
 
+    printf("Thread %ld: NOTIFY_READ_BARRIER\n", (long int)pthread_self());
+
     err = pthread_mutex_lock(&__mutex_read);
     assert(0 == err);
-
-    __ready_handlers++;
 
     err = pthread_cond_broadcast(&__cond_read);
     assert(0 == err);
