@@ -104,6 +104,7 @@ static void finish_ni(data_acq_info_t *dai) {
 static data_acq_info_t *init_ni(void) {
     data_acq_info_t *dai = malloc(sizeof *dai);
     dai->failed = false;
+    dai->opaque_task_handle = NULL;
 #ifdef WITH_NI
     TaskHandle *h = malloc(sizeof *h);
     assert(NULL != h);
