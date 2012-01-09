@@ -91,8 +91,8 @@ static void finish_ni(data_acq_info_t *dai) {
 
     free(dai->opaque_task_handle);
     free(dai->opaque_error);
-    free(dai);
 #endif
+    free(dai);
 }
 
 #define \
