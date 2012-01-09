@@ -19,7 +19,6 @@ void set_ready(uint64_t da);
 
 void inc_available_handlers(void);
 void dec_available_handlers(void);
-unsigned int get_available_handlers(void);
 
 void reset_ready_handlers(void);
 

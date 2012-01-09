@@ -52,6 +52,21 @@ void abs_wait_timeout(struct timespec *abs_timeout) {
 #endif
 }
 
+static unsigned int get_available_handlers(void) {
+    unsigned int handlers;
+    int err;
+
+    err = pthread_mutex_lock(&__mutex_handlers);
+    assert(0 == err);
+
+    handlers = __available_handlers;
+
+    err = pthread_mutex_unlock(&__mutex_handlers);
+    assert(0 == err);
+
+    return handlers;
+}
+
 void wait_read_barrier(void) {
     int err;
     time_t timer;
