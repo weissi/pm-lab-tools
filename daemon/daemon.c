@@ -213,8 +213,7 @@ static void *ni_thread_main(void *opaque_info) {
         if(!running) {
             break;
         }
-        reset_ready_handlers();
-        /* notify_data_unavailable(); */
+
         err = read_ni(h, data_size, analog_data, &points_pc);
         if (0 != err) {
             running = false;
@@ -239,7 +238,8 @@ static void *ni_thread_main(void *opaque_info) {
         assert(0 == err);
 
         printf("NI: read successful, ts = %"PRIu64"\n", timestamp);
-        notify_data_available(timestamp);
+        reset_ready_handlers();
+        notify_data_available();
     }
 
     finish_ni(h);
@@ -335,6 +335,8 @@ int main(int argc, char **argv) {
     signal(SIGINT, (void (*)(int))sig_hnd);
     signal(SIGPIPE, SIG_IGN);
 
+    init_sync();
+
     err = pthread_create(&acquire_data_thread, NULL, ni_thread_main, &data_info);
     assert(0 == err);
 
@@ -342,6 +344,8 @@ int main(int argc, char **argv) {
 
     err = pthread_join(acquire_data_thread, NULL);
     assert(0 == err);
+
+    finish_sync();
 
     return 0;
 }
