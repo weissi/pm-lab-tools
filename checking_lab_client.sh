@@ -12,8 +12,9 @@ else
     SLEEP=10
 fi
 
-numstr="0"
+numstr="START"
 errs=0
+pread=0
 
 while read count num; do
     numstr="$numstr,$num"
@@ -22,6 +23,7 @@ while read count num; do
         numstr="$numstr(XXX)"
     fi
     oldnum=$num
+    pread=$(( $pread + 1 ))
 done < <(
     ( build/pmlabclient localhost 12345 2> /dev/null & PMC=$!;
       sleep $SLEEP;
@@ -29,7 +31,7 @@ done < <(
 )
 
 if [ $errs -eq 0 ]; then
-    echo OK $numstr
+    echo "OK (read $pread packets): $numstr"
     exit 0
 else
     echo "ERROR: $errs ($numstr)"
