@@ -174,13 +174,13 @@ void wait_read_barrier(void) {
         err = pthread_cond_timedwait(&__cond_read, &__mutex, &abs_timeout);
         assert(0 == err || ETIMEDOUT == err);
 
-        debug_sets("wait_read_barrier (while waiting)");
+        if(ETIMEDOUT == err) {
+            debug_sets("wait_read_barrier (TIMEOUT!)");
+        }
     }
 
     assert(0 == pblSetSize(__pending_handler_set));
     assert(pblSetEquals(__done_handler_set, __active_handler_set) > 0);
-
-    debug_sets("wait_read_barrier (after waiting)");
 
     err = pthread_mutex_unlock(&__mutex);
     assert(0 == err);
@@ -191,9 +191,6 @@ void wait_read_barrier(void) {
 void notify_read_barrier(void) {
     int err;
 
-    printf("Thread %lu: NOTIFY_READ_BARRIER\n",
-           (unsigned long int)pthread_self());
-
     err = pthread_mutex_lock(&__mutex);
     assert(0 == err);
 
@@ -202,17 +199,12 @@ void notify_read_barrier(void) {
 
     err = pthread_mutex_unlock(&__mutex);
     assert(0 == err);
-
-    printf("NOTIFIED READ BARRIER\n");
 }
 
 void set_ready(void) {
     pthread_t self = pthread_self();
     pthread_t *persistent_self;
     int err;
-
-    printf("Thread %lu: READY\n",
-           (unsigned long int)pthread_self());
 
     err = pthread_mutex_lock(&__mutex);
     assert(0 == err);
@@ -247,7 +239,9 @@ void wait_data_available(void) {
         err = pthread_cond_timedwait(&__cond_data, &__mutex, &abs_timeout);
         assert(0 == err || ETIMEDOUT == err);
 
-        debug_sets("wait_data_available (while waiting)");
+        if(ETIMEDOUT == err) {
+            debug_sets("wait_data_available (TIMEOUT!)");
+        }
     }
     assert(0 != pblSetContains(__pending_handler_set, &self));
 
@@ -287,7 +281,6 @@ void inc_available_handlers(void) {
     assert(0 == err);
 
     notify_read_barrier();
-    printf("NEW HANDLER: %ld\n", self);
 }
 
 void dec_available_handlers(void) {
@@ -332,7 +325,6 @@ void dec_available_handlers(void) {
     assert(0 == err);
 
     notify_read_barrier();
-    printf("DEL HANDLER: %ld\n", *persistent_self);
 }
 
 void reset_ready_handlers(void) {
@@ -342,23 +334,12 @@ void reset_ready_handlers(void) {
     assert(0 == err);
 
     err = pblSetAddAll(__active_handler_set, __alive_handler_set);
-    if(PBL_ERROR_OUT_OF_MEMORY == pbl_errno) {
-        printf("--------> OOM\n");
-    } else if(PBL_ERROR_PARAM_COLLECTION == pbl_errno) {
-        printf("--------> NO ITER\n");
-    } else if(PBL_ERROR_CONCURRENT_MODIFICATION == pbl_errno) {
-        printf("--------> CONC MOD\n");
-    } else if(err < 0) {
-        printf("--------> UNKNOWN\n");
-    }
     assert(err >= 0);
 
     err = pblSetAddAll(__pending_handler_set, __active_handler_set);
     assert(err >= 0);
 
     pblSetClear(__done_handler_set);
-
-    debug_sets("reset_ready_handlers (new condition)");
 
     err = pthread_cond_broadcast(&__cond_read);
     assert(0 == err);
