@@ -80,7 +80,9 @@ void *pm_connect(char *server,
     /* send channel description */
     err = full_write(sockfd, (char *)&net_nc, sizeof(num_channels));
     assert(sizeof(num_channels) == err);
-    err = full_write(sockfd, (char *)net_channels, num_channels*sizeof(uint32_t));
+    err = full_write(sockfd,
+                     (char *)net_channels,
+                     num_channels*sizeof(uint32_t));
 
     err = full_read(sockfd, welcome_msg, sizeof(WELCOME_MSG));
     assert(sizeof(WELCOME_MSG) == err);
@@ -127,7 +129,7 @@ int pm_read(void *h,
     }
     assert(sizeof(MAGIC_DATA_SET)==err);
     ret += err;
-    assert(0==strncmp(MAGIC_DATA_SET, magic_data_buffer, sizeof(MAGIC_DATA_SET)));
+    assert(0==strncmp(MAGIC_DATA_SET,magic_data_buffer,sizeof(MAGIC_DATA_SET)));
 
     err = full_read(handle->sockfd, (char *)&net_msg_len, sizeof(uint32_t));
     if(0 == err) {
@@ -158,8 +160,12 @@ int pm_read(void *h,
         assert(n_samples == points->n_digital_data);
         assert(buffer_sizes >= offset+n_samples);
 
-        memcpy(analog_data + offset, points->analog_data, n_samples*sizeof(double));
-        memcpy(digital_data + offset, points->digital_data, n_samples*sizeof(digival_t));
+        memcpy(analog_data + offset,
+               points->analog_data,
+               n_samples * sizeof(double));
+        memcpy(digital_data + offset,
+               points->digital_data,
+               n_samples * sizeof(digival_t));
         offset += n_samples;
         assert (0 == *samples_read || n_samples == *samples_read);
         *samples_read = n_samples;

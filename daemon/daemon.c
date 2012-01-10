@@ -253,14 +253,11 @@ static void *dead_handler_thread_main() {
     pthread_t *zombie;
 
     while(running || have_alive_threads()) {
-        printf("--------> WAITING NEXT ZOMBIE, running: %d, alive: %d\n", running, have_alive_threads());
         zombie = wait_dead_handler();
         assert(NULL != zombie);
 
-        printf("--------> ZOMBIE FOUND: %lu\n", (long unsigned int)*zombie);
         err = pthread_join(*zombie, NULL);
         assert(0 == err);
-        printf("--------> ZOMBIE DEAD: %lu\n", (long unsigned int)*zombie);
 
         free(zombie);
     }
@@ -299,10 +296,18 @@ static void wait_for_connections(input_data_t *data_info) {
     assert(0 <= server_sock);
 
     sock_opt = 1;
-    err = setsockopt(server_sock, SOL_SOCKET, SO_REUSEADDR, &sock_opt, sizeof(sock_opt));
+    err = setsockopt(server_sock,
+                     SOL_SOCKET,
+                     SO_REUSEADDR,
+                     &sock_opt,
+                     sizeof(sock_opt));
     assert(0 == err);
     sock_opt = 1;
-    err = setsockopt(server_sock, IPPROTO_TCP, TCP_NODELAY, &sock_opt, sizeof(int));
+    err = setsockopt(server_sock,
+                     IPPROTO_TCP,
+                     TCP_NODELAY,
+                     &sock_opt,
+                     sizeof(int));
     assert(0 == err);
 
     memset(&servaddr, 0, sizeof(servaddr));

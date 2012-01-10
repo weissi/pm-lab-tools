@@ -299,7 +299,7 @@ void *handler_thread_main(void *opaque_info) {
     uint32_t *channels;
     pthread_t sender_thread;
     volatile bool handler_running = true;
-    buffer_desc_t buffer_desc = { .buffer = malloc(BUF_SIZE * sizeof(input_data_t))
+    buffer_desc_t buffer_desc = { .buffer =malloc(BUF_SIZE*sizeof(input_data_t))
                                 , .lock = PTHREAD_MUTEX_INITIALIZER
                                 , .cond = PTHREAD_COND_INITIALIZER
                                 , .count = 0
@@ -319,7 +319,9 @@ void *handler_thread_main(void *opaque_info) {
     net_channels = alloca(sizeof(uint32_t)*num_channels);
     channels = alloca(sizeof(uint32_t)*num_channels);
 
-    err = full_read(info->fd, (char *)net_channels, sizeof(uint32_t)*num_channels);
+    err = full_read(info->fd,
+                    (char *)net_channels,
+                    sizeof(uint32_t)*num_channels);
     assert(sizeof(uint32_t)*num_channels == err);
 
     for(i = 0; i < num_channels; i++) {
@@ -333,7 +335,10 @@ void *handler_thread_main(void *opaque_info) {
     sender_info.num_channels = num_channels;
     sender_info.channels = channels;
 
-    err = pthread_create(&sender_thread, NULL, handler_sender_main, &sender_info);
+    err = pthread_create(&sender_thread,
+                         NULL,
+                         handler_sender_main,
+                         &sender_info);
     assert(0 == err);
 
     printf("Handler thread accepted %d\n", info->fd);
@@ -358,7 +363,7 @@ void *handler_thread_main(void *opaque_info) {
             break;
         }
         assert(0 == err);
-        printf("Buffer %p has now %zu/%zu element(s) starting at %p (offset = %zu)\n",
+        printf("Buffer %p has %zu/%zu element(s) start at %p (offset = %zu)\n",
                (void *)buffer_desc.buffer,
                buffer_desc.count,
                buffer_desc.max_elems,

@@ -168,7 +168,8 @@ void wait_read_barrier(void) {
     err = pthread_mutex_lock(&__mutex);
     assert(0 == err);
 
-    while(running && pblSetEquals(__done_handler_set, __active_handler_set) == 0) {
+    while(running &&
+          pblSetEquals(__done_handler_set, __active_handler_set) == 0) {
         abs_wait_timeout(&abs_timeout);
         err = pthread_cond_timedwait(&__cond_read, &__mutex, &abs_timeout);
         assert(0 == err || ETIMEDOUT == err);
