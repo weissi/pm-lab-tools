@@ -6,16 +6,23 @@
 #include "libpmlab.h"
 #include "common/conf.h"
 
+/* buffers, have to be large enough to read from the network */
+#define BUFFER_SIZES  (8 * 50000)
+static double analog_data[BUFFER_SIZES] = { 0 };
+static digival_t digital_data[BUFFER_SIZES] = { 0 };
+
 int main(int argc, char *argv[])
 {
     /* channels to listen to */
-    uint32_t channels[] = { CPU1, TRIGGER1 };
+    uint32_t channels[] = { 
+        PM2_DD,
+        PM3_DD,
+        PM4_DD,
+        PM5_CPU,
+        PM6_CPU,
+        PM7_CPU
+    };
     unsigned int num_channels = sizeof(channels)/sizeof(uint32_t);
-
-    /* buffers, have to be large enough to read from the network */
-    const size_t buffer_sizes = 100000;
-    double analog_data[buffer_sizes];
-    digival_t digital_data[buffer_sizes];
 
     /* misc */
     void *pm_handle = NULL;
@@ -47,7 +54,7 @@ int main(int argc, char *argv[])
         int i, j;
         /* read data from network */
         int err = pm_read(pm_handle,
-                          buffer_sizes,
+                          BUFFER_SIZES,
                           analog_data,
                           digital_data,
                           &sample_count,

@@ -2,12 +2,12 @@
 #define CONF_H
 
 enum channel_ids {
-    CPU1 = 0,
-    TRIGGER1 = 1,
-    CPU2 = 2,
-    TRIGGER2 = 3,
-    CHAN5 = 4,
-    CHAN6 = 5,
+    PM2_DD = 0,
+    PM3_DD = 1,
+    PM4_DD = 2,
+    PM5_CPU = 3,
+    PM6_CPU = 4,
+    PM7_CPU = 5,
     CHAN7 = 6,
     CHAN8 = 7
 };
