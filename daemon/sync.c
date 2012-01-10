@@ -317,7 +317,8 @@ void dec_available_handlers(void) {
     assert(NULL == persistent_self_active ||
            persistent_self == persistent_self_active);
 
-    assert(0 != pblSetRemoveElement(__alive_handler_set, persistent_self));
+    err = pblSetRemoveElement(__alive_handler_set, persistent_self);
+    assert(0 != err);
     pblSetRemoveElement(__pending_handler_set, persistent_self);
     pblSetRemoveElement(__done_handler_set, persistent_self);
     pblSetRemoveElement(__active_handler_set, persistent_self);
