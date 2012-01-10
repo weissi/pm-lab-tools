@@ -23,23 +23,23 @@
                                  (unsigned long int)pthread_self(), \
                                  (long int)(t))
 
-static pthread_mutex_t __mutex_read = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t __mutex = PTHREAD_MUTEX_INITIALIZER;
+
 static pthread_cond_t __cond_read = PTHREAD_COND_INITIALIZER;
-//static pthread_mutex_t __mutex_data = __mutex_read; PTHREAD_MUTEX_INITIALIZER;
-#define __mutex_data __mutex_read
 static pthread_cond_t __cond_data = PTHREAD_COND_INITIALIZER;
-//static pthread_mutex_t __mutex_handlers = __mutex_read; PTHREAD_MUTEX_INITIALIZER;
-#define __mutex_handlers __mutex_read
+static pthread_cond_t __cond_dead_handler = PTHREAD_COND_INITIALIZER;
 
 static PblSet *__done_handler_set = NULL; /* handlers that have done the current
                                              copy operation */
 static PblSet *__pending_handler_set = NULL; /* handlers that are active but yet
                                                 have to copy the current data */
 static PblSet *__active_handler_set = NULL; /* all handlers that get data */
-static PblSet *__alive_set = NULL; /* all handlers that are alive */
+static PblSet *__alive_handler_set = NULL; /* all handlers that are alive */
+static PblSet *__dead_handler_set = NULL; /* all handlers that are dead
+                                             (pthread_joinable) */
 
 /* __done_handler_set + __pending_handler_set = __active_handler_set
- * __active_handler_set € __alive_set
+ * __active_handler_set € __alive_handler_set
  */
 
 static int pthread_hash(const void *element) {
@@ -69,11 +69,6 @@ static int pthread_compare(const void *prev, const void *next) {
         ret = 1;
     }
 
-    printf("pthread_compare(%lu, %lu) = %d;\n",
-           (unsigned long int)p,
-           (unsigned long int)n,
-           ret);
-
     return ret;
 }
 
@@ -81,24 +76,28 @@ void init_sync(void) {
     __pending_handler_set = pblSetNewHashSet();
     __done_handler_set = pblSetNewHashSet();
     __active_handler_set = pblSetNewHashSet();
-    __alive_set = pblSetNewHashSet();
+    __alive_handler_set = pblSetNewHashSet();
+    __dead_handler_set = pblSetNewHashSet();
 
     pblSetSetCompareFunction(__pending_handler_set, pthread_compare);
     pblSetSetCompareFunction(__done_handler_set, pthread_compare);
     pblSetSetCompareFunction(__active_handler_set, pthread_compare);
-    pblSetSetCompareFunction(__alive_set, pthread_compare);
+    pblSetSetCompareFunction(__alive_handler_set, pthread_compare);
+    pblSetSetCompareFunction(__dead_handler_set, pthread_compare);
 
     pblSetSetHashValueFunction(__pending_handler_set, pthread_hash);
     pblSetSetHashValueFunction(__done_handler_set, pthread_hash);
     pblSetSetHashValueFunction(__active_handler_set, pthread_hash);
-    pblSetSetHashValueFunction(__alive_set, pthread_hash);
+    pblSetSetHashValueFunction(__alive_handler_set, pthread_hash);
+    pblSetSetHashValueFunction(__dead_handler_set, pthread_hash);
 }
 
 void finish_sync(void) {
     pblSetFree(__pending_handler_set);
     pblSetFree(__done_handler_set);
     pblSetFree(__active_handler_set);
-    pblSetFree(__alive_set);
+    pblSetFree(__alive_handler_set);
+    pblSetFree(__dead_handler_set);
 }
 
 static void debug_set(PblSet *set) {
@@ -118,7 +117,10 @@ static void debug_sets(const char *debug_str) {
     }
     printf("---------------------------------------------------------\n");
     printf("ALIVE SET:   ");
-    debug_set(__alive_set);
+    debug_set(__alive_handler_set);
+    printf("\n");
+    printf("DEAD SET:   ");
+    debug_set(__dead_handler_set);
     printf("\n");
     printf("ACTIVE SET:  ");
     debug_set(__active_handler_set);
@@ -163,12 +165,12 @@ void wait_read_barrier(void) {
     struct timespec abs_timeout;
 
     START_TIMING(timer);
-    err = pthread_mutex_lock(&__mutex_read);
+    err = pthread_mutex_lock(&__mutex);
     assert(0 == err);
 
     while(running && pblSetEquals(__done_handler_set, __active_handler_set) == 0) {
         abs_wait_timeout(&abs_timeout);
-        err = pthread_cond_timedwait(&__cond_read, &__mutex_read, &abs_timeout);
+        err = pthread_cond_timedwait(&__cond_read, &__mutex, &abs_timeout);
         assert(0 == err || ETIMEDOUT == err);
 
         debug_sets("wait_read_barrier (while waiting)");
@@ -179,7 +181,7 @@ void wait_read_barrier(void) {
 
     debug_sets("wait_read_barrier (after waiting)");
 
-    err = pthread_mutex_unlock(&__mutex_read);
+    err = pthread_mutex_unlock(&__mutex);
     assert(0 == err);
     STOP_TIMING(timer);
     PRINT_TIMING(timer, "wait_read_barrier");
@@ -191,13 +193,13 @@ void notify_read_barrier(void) {
     printf("Thread %lu: NOTIFY_READ_BARRIER\n",
            (unsigned long int)pthread_self());
 
-    err = pthread_mutex_lock(&__mutex_read);
+    err = pthread_mutex_lock(&__mutex);
     assert(0 == err);
 
     err = pthread_cond_broadcast(&__cond_read);
     assert(0 == err);
 
-    err = pthread_mutex_unlock(&__mutex_read);
+    err = pthread_mutex_unlock(&__mutex);
     assert(0 == err);
 
     printf("NOTIFIED READ BARRIER\n");
@@ -211,7 +213,7 @@ void set_ready(void) {
     printf("Thread %lu: READY\n",
            (unsigned long int)pthread_self());
 
-    err = pthread_mutex_lock(&__mutex_read);
+    err = pthread_mutex_lock(&__mutex);
     assert(0 == err);
 
     persistent_self = pblSetGetElement(__active_handler_set, &self);
@@ -221,7 +223,7 @@ void set_ready(void) {
     err = pblSetRemoveElement(__pending_handler_set, persistent_self);
     assert(0 != err);
 
-    err = pthread_mutex_unlock(&__mutex_read);
+    err = pthread_mutex_unlock(&__mutex);
     assert(0 == err);
 
     notify_read_barrier();
@@ -234,21 +236,21 @@ void wait_data_available(void) {
     pthread_t self = pthread_self();
 
     START_TIMING(timer);
-    err = pthread_mutex_lock(&__mutex_data);
+    err = pthread_mutex_lock(&__mutex);
     assert(0 == err);
     while(running &&
           0 == pblSetContains(__pending_handler_set, &self)) {
         /* waiting here as long daemon is running AND
          * pending does not contain our handler */
         abs_wait_timeout(&abs_timeout);
-        err = pthread_cond_timedwait(&__cond_data, &__mutex_data, &abs_timeout);
+        err = pthread_cond_timedwait(&__cond_data, &__mutex, &abs_timeout);
         assert(0 == err || ETIMEDOUT == err);
 
         debug_sets("wait_data_available (while waiting)");
     }
     assert(0 != pblSetContains(__pending_handler_set, &self));
 
-    err = pthread_mutex_unlock(&__mutex_data);
+    err = pthread_mutex_unlock(&__mutex);
     assert(0 == err);
 
     STOP_TIMING(timer);
@@ -258,13 +260,13 @@ void wait_data_available(void) {
 void notify_data_available(void) {
     int err;
 
-    err = pthread_mutex_lock(&__mutex_data);
+    err = pthread_mutex_lock(&__mutex);
     assert(0 == err);
 
     err = pthread_cond_broadcast(&__cond_data);
     assert(0 == err);
 
-    err = pthread_mutex_unlock(&__mutex_data);
+    err = pthread_mutex_unlock(&__mutex);
     assert(0 == err);
 }
 
@@ -274,13 +276,13 @@ void inc_available_handlers(void) {
     pthread_t *persistent_self = malloc(sizeof *persistent_self);
     assert(NULL != persistent_self);
 
-    err = pthread_mutex_lock(&__mutex_handlers);
+    err = pthread_mutex_lock(&__mutex);
     assert(0 == err);
 
     *persistent_self = self;
-    pblSetAdd(__alive_set, persistent_self);
+    pblSetAdd(__alive_handler_set, persistent_self);
 
-    err = pthread_mutex_unlock(&__mutex_handlers);
+    err = pthread_mutex_unlock(&__mutex);
     assert(0 == err);
 
     notify_read_barrier();
@@ -295,47 +297,56 @@ void dec_available_handlers(void) {
     pthread_t *persistent_self_active;
     int err;
 
-    err = pthread_mutex_lock(&__mutex_handlers);
+    err = pthread_mutex_lock(&__mutex);
     assert(0 == err);
 
-    persistent_self = pblSetGetElement(__alive_set, &self);
-    persistent_self_pend = pblSetGetElement(__pending_handler_set, &self);
-    persistent_self_done = pblSetGetElement(__done_handler_set, &self);
-    persistent_self_active = pblSetGetElement(__active_handler_set, &self);
+    persistent_self = pblSetGetElement(__alive_handler_set, &self);
+    persistent_self_pend = pblSetGetElement(__pending_handler_set,
+                                            persistent_self);
+    persistent_self_done = pblSetGetElement(__done_handler_set,
+                                            persistent_self);
+    persistent_self_active = pblSetGetElement(__active_handler_set,
+                                              persistent_self);
 
     assert(NULL != persistent_self);
-    assert(NULL == persistent_self_pend || persistent_self == persistent_self_pend);
-    assert(NULL == persistent_self_done || persistent_self == persistent_self_done);
-    assert(NULL == persistent_self_active || persistent_self == persistent_self_active);
+    assert(NULL == persistent_self_pend ||
+           persistent_self == persistent_self_pend);
+    assert(NULL == persistent_self_done ||
+           persistent_self == persistent_self_done);
+    assert(NULL == persistent_self_active ||
+           persistent_self == persistent_self_active);
 
-    assert(0 != pblSetRemoveElement(__alive_set, &self));
-    pblSetRemoveElement(__pending_handler_set, &self);
-    pblSetRemoveElement(__done_handler_set, &self);
-    pblSetRemoveElement(__active_handler_set, &self);
+    assert(0 != pblSetRemoveElement(__alive_handler_set, persistent_self));
+    pblSetRemoveElement(__pending_handler_set, persistent_self);
+    pblSetRemoveElement(__done_handler_set, persistent_self);
+    pblSetRemoveElement(__active_handler_set, persistent_self);
 
-    free(persistent_self);
+    pblSetAdd(__dead_handler_set, persistent_self);
 
-    err = pthread_mutex_unlock(&__mutex_handlers);
+    err = pthread_cond_broadcast(&__cond_dead_handler);
+    assert(0 == err);
+
+    err = pthread_mutex_unlock(&__mutex);
     assert(0 == err);
 
     notify_read_barrier();
-    printf("DEL HANDLER: %ld\n", self);
+    printf("DEL HANDLER: %ld\n", *persistent_self);
 }
 
 void reset_ready_handlers(void) {
     int err;
 
-    err = pthread_mutex_lock(&__mutex_read);
+    err = pthread_mutex_lock(&__mutex);
     assert(0 == err);
 
-    err = pblSetAddAll(__active_handler_set, __alive_set);
+    err = pblSetAddAll(__active_handler_set, __alive_handler_set);
     if(PBL_ERROR_OUT_OF_MEMORY == pbl_errno) {
         printf("--------> OOM\n");
     } else if(PBL_ERROR_PARAM_COLLECTION == pbl_errno) {
         printf("--------> NO ITER\n");
     } else if(PBL_ERROR_CONCURRENT_MODIFICATION == pbl_errno) {
         printf("--------> CONC MOD\n");
-    } else {
+    } else if(err < 0) {
         printf("--------> UNKNOWN\n");
     }
     assert(err >= 0);
@@ -350,6 +361,46 @@ void reset_ready_handlers(void) {
     err = pthread_cond_broadcast(&__cond_read);
     assert(0 == err);
 
-    err = pthread_mutex_unlock(&__mutex_read);
+    err = pthread_mutex_unlock(&__mutex);
     assert(0 == err);
+}
+
+pthread_t *wait_dead_handler(void) {
+    pthread_t *dead_thread;
+    int err;
+
+    err = pthread_mutex_lock(&__mutex);
+    assert(0 == err);
+
+    while(0 == pblSetSize(__dead_handler_set)) {
+        err = pthread_cond_wait(&__cond_dead_handler, &__mutex);
+        assert(0 == err);
+    }
+
+    dead_thread = (pthread_t *)pblSetGet(__dead_handler_set, 0);
+    assert(NULL != dead_thread);
+
+    err = pblSetRemoveElement(__dead_handler_set, dead_thread);
+    assert(0 != err);
+
+    err = pthread_mutex_unlock(&__mutex);
+    assert(0 == err);
+
+    return dead_thread;
+}
+
+bool have_alive_threads(void) {
+    bool ret;
+    int err;
+
+    err = pthread_mutex_lock(&__mutex);
+    assert(0 == err);
+
+    ret = pblSetSize(__alive_handler_set);
+
+    err = pthread_mutex_unlock(&__mutex);
+    assert(0 == err);
+
+    assert(ret >= 0);
+    return ret > 0;
 }

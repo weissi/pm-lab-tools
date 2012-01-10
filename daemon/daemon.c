@@ -248,6 +248,26 @@ static void *ni_thread_main(void *opaque_info) {
     return NULL;
 }
 
+static void *dead_handler_thread_main() {
+    int err;
+    pthread_t *zombie;
+
+    while(running || have_alive_threads()) {
+        printf("--------> WAITING NEXT ZOMBIE, running: %d, alive: %d\n", running, have_alive_threads());
+        zombie = wait_dead_handler();
+        assert(NULL != zombie);
+
+        printf("--------> ZOMBIE FOUND: %lu\n", (long unsigned int)*zombie);
+        err = pthread_join(*zombie, NULL);
+        assert(0 == err);
+        printf("--------> ZOMBIE DEAD: %lu\n", (long unsigned int)*zombie);
+
+        free(zombie);
+    }
+
+    return NULL;
+}
+
 static void launch_handler_thread(input_data_t *data_info, int conn_fd) {
     pthread_t handler_thread;
     int err;
@@ -328,7 +348,7 @@ static void wait_for_connections(input_data_t *data_info) {
 
 int main(int argc, char **argv) {
     input_data_t data_info;
-    pthread_t acquire_data_thread;
+    pthread_t acquire_data_thread, collect_dead_handlers_thread;
 
     int err;
 
@@ -337,12 +357,27 @@ int main(int argc, char **argv) {
 
     init_sync();
 
-    err = pthread_create(&acquire_data_thread, NULL, ni_thread_main, &data_info);
+    err = pthread_create(&acquire_data_thread,
+                         NULL,
+                         ni_thread_main,
+                         &data_info);
+    assert(0 == err);
+
+    err = pthread_create(&collect_dead_handlers_thread,
+                         NULL,
+                         dead_handler_thread_main,
+                         NULL);
     assert(0 == err);
 
     wait_for_connections(&data_info);
 
     err = pthread_join(acquire_data_thread, NULL);
+    assert(0 == err);
+
+    err = pthread_cancel(collect_dead_handlers_thread);
+    assert(0 == err);
+
+    err = pthread_join(collect_dead_handlers_thread, NULL);
     assert(0 == err);
 
     finish_sync();

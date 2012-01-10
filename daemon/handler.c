@@ -286,6 +286,7 @@ void *handler_sender_main(void *opaque_sender_info) {
         }
     }
 
+    *sender_info->handler_running = false;
     return NULL;
 }
 
@@ -342,7 +343,7 @@ void *handler_thread_main(void *opaque_info) {
     err = full_write(info->fd, (char *)&net_sampling_rate, sizeof(uint32_t));
     assert(sizeof(uint32_t) == err);
 
-    while(running) {
+    while(running && handler_running) {
         wait_data_available();
         if(!running) {
             break;
@@ -364,13 +365,14 @@ void *handler_thread_main(void *opaque_info) {
 
         set_ready();
 
+        /*
 #ifndef __MACH__
         err = pthread_tryjoin_np(sender_thread, NULL);
         if(EBUSY != err) {
-            /* delay end of thread because we're seen as "ready thread" */
             break;
         }
 #endif
+*/
     }
     dec_available_handlers();
     handler_running = false;

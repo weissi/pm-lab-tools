@@ -26,4 +26,7 @@ void dec_available_handlers(void);
 
 void reset_ready_handlers(void);
 
+bool have_alive_threads(void);
+pthread_t *wait_dead_handler(void);
+
 #endif
