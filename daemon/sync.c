@@ -243,7 +243,7 @@ void wait_data_available(void) {
             debug_sets("wait_data_available (TIMEOUT!)");
         }
     }
-    assert(0 != pblSetContains(__pending_handler_set, &self));
+    assert(!running || 0 != pblSetContains(__pending_handler_set, &self));
 
     err = pthread_mutex_unlock(&__mutex);
     assert(0 == err);
