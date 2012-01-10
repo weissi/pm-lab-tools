@@ -318,8 +318,10 @@ void *handler_thread_main(void *opaque_info) {
 
     net_channels = alloca(sizeof(uint32_t)*num_channels);
     channels = alloca(sizeof(uint32_t)*num_channels);
-    err = read(info->fd, net_channels, sizeof(uint32_t)*num_channels);
+
+    err = full_read(info->fd, (char *)net_channels, sizeof(uint32_t)*num_channels);
     assert(sizeof(uint32_t)*num_channels == err);
+
     for(i = 0; i < num_channels; i++) {
         channels[i] = ntohl(net_channels[i]);
         assert(channels[i] < info->data_info->num_channels);
