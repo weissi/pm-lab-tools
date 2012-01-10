@@ -17,7 +17,7 @@ enum channel_ids {
 #define U_MIN ((double)-0.2)
 #define U_MAX ((double)0.2)
 #define CLK_SRC "OnboardClock"
-#define SAMPLING_RATE ((unsigned int)30000)
+#define SAMPLING_RATE ((unsigned int)18000)
 #define TIMEOUT ((unsigned int)10)
 
 #endif
