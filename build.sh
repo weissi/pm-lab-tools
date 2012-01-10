@@ -5,6 +5,19 @@ set -e
 HERE=$(cd $(dirname "${BASH_SOURCE[0]}") > /dev/null && pwd)
 cd "$HERE"
 
+if [ ! -d pbl ]; then
+    echo "- Fetching pbl"
+    wget -q http://www.mission-base.com/peter/source/pbl_1_04.tar.gz
+    echo "- Unpacking pbl"
+    tar xf pbl_1_04.tar.gz
+    mv pbl_1_04_04 pbl
+fi
+
+echo "- Building PBL"
+cd pbl/src
+make
+cd ../..
+
 rm build/*.o &> /dev/null || true
 
 if [ "$1" = "-n" ]; then
@@ -30,7 +43,8 @@ function compile_c() {
         ALDF=""
     fi
     gcc -std=gnu99 -Wall -Werror -pedantic $ALDF -c $CFLAGS \
-        -Idaemon -Icommon -Igensrc -o "build/$(basename $1).o" $1.c
+        -Idaemon -Icommon -Igensrc -Ipbl/src \
+        -o "build/$(basename $1).o" $1.c
 }
 
 echo "- Generating protos"
@@ -69,15 +83,16 @@ if [ "$#" -lt 1 -o "$1" = "daemon" ]; then
 
     echo
     echo "Building Daemon"
-    compile_c daemon/daemon
     compile_c daemon/handler
     compile_c daemon/sync
     for f in gensrc/*.c; do
         compile_c ${f%*.c}
     done
+    compile_c daemon/daemon
     echo "- Linking deamon"
     if [ -f build/daemon ]; then
         rm build/daemon
     fi
-    gcc $LDFLAGS $NI_LDFLAGS -lprotobuf-c -lpthread -o build/daemon build/*.o
+    gcc $LDFLAGS $NI_LDFLAGS -lprotobuf-c -lpthread -o build/daemon \
+        build/*.o pbl/src/libpbl.a
 fi
