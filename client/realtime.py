@@ -15,11 +15,12 @@ brown = 85, 58, 38
 colors = [red,green,blue,purple,orange,yellow,black,brown]
 
 RESOLUTION = (640,480)
+calc_power_fun = None
 
 def readline():
     line = sys.stdin.readline().rstrip()
     parts = line.split()
-    return float(parts[0]), map(float, parts[1:])
+    return float(parts[0]), map(calc_power_fun, parts[1:])
 
 def weightvalues(arr, weight):
     return map(lambda x: x*weight, arr)
@@ -40,15 +41,23 @@ def average_interval(interval_size):
     channel_sums = map(sum, zip(channel_sums, weightvalues(nextvalues, interval_weight)))
     return map(lambda x: x/interval_size, channel_sums)
 
-if len(sys.argv) != 2 and len(sys.argv) != 3:
-    print "USAGE: %s <window-time-frame> [<quality>]" % (sys.argv[0])
+if len(sys.argv) != 2 and len(sys.argv) != 3 and len(sys.argv) != 5:
+    print "USAGE: %s <window-time-frame> [<quality> [<voltage V> "\
+            "<resistance mOhm>]]" % (sys.argv[0])
     sys.exit(1)
 
 time_resolution = float(sys.argv[1])
-if len(sys.argv) == 3:
+if len(sys.argv) == 3 or len(sys.argv) == 5:
     quality = int(sys.argv[2])
 else:
     quality = 1
+
+if len(sys.argv) == 5:
+    calc_power_fun = lambda v: (float(v)*float(sys.argv[3]) / \
+                               (float(sys.argv[4]) / 1000.0))
+else:
+    calc_power_fun = lambda v: float(v)
+
 width = RESOLUTION[0]
 window_width = width/quality
 height = RESOLUTION[1]
