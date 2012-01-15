@@ -41,7 +41,7 @@ def average_interval(interval_size):
     return map(lambda x: x/interval_size, channel_sums)
 
 if len(sys.argv) != 2 and len(sys.argv) != 3:
-    print "USAGE: %s <window-time-frame>" % (sys.argv[0])
+    print "USAGE: %s <window-time-frame> [<quality>]" % (sys.argv[0])
     sys.exit(1)
 
 time_resolution = float(sys.argv[1])
@@ -54,7 +54,7 @@ window_width = width/quality
 height = RESOLUTION[1]
 height_used = int(0.8*height)
 height_offset = (height-height_used)/2
-time_per_sample= time_resolution/window_width*quality
+time_per_sample= time_resolution/window_width
 
 # read first value, set up variables
 lasttime, lastvalues = readline()
@@ -93,6 +93,9 @@ while 1:
             horizontal_ticks.append((window_width, lasttime))
     avg_min = min(avg_min, min(min(e) for e in averages))
     avg_max = max(avg_max, max(max(e) for e in averages))
+    if (avg_min == avg_max):
+        avg_max = avg_max*1.001
+        avg_min = avg_min*0.999
     for event in pygame.event.get():
         if event.type == pygame.QUIT: sys.exit()
     screen.fill(white)
