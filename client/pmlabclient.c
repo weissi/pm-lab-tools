@@ -14,13 +14,13 @@ static digival_t digital_data[BUFFER_SIZES] = { 0 };
 int main(int argc, char *argv[])
 {
     /* channels to listen to */
-    uint32_t channels[] = { 
+    uint32_t channels[] = {
         PM2_DD,
         PM3_DD,
         PM4_DD,
         PM5_CPU,
         PM6_CPU,
-        PM7_CPU
+        PM7_CPU,
     };
     unsigned int num_channels = sizeof(channels)/sizeof(uint32_t);
 
