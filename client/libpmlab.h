@@ -44,7 +44,9 @@ uint32_t pm_samplingrate(void *handle);
  *                   sample will be written to
  *
  * Returns:
- * 0 on success
+ * 0 on EOF
+ * n | n > 0 when n bytes have successfully been read
+ * m | m < 0 on error
  */
 int pm_read(void *handle,
             size_t buffer_sizes,
