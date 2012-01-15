@@ -5,18 +5,20 @@ set -e
 HERE=$(cd $(dirname "${BASH_SOURCE[0]}") > /dev/null && pwd)
 cd "$HERE"
 
-if [ ! -d pbl ]; then
-    echo "- Fetching pbl"
-    wget -q http://www.mission-base.com/peter/source/pbl_1_04.tar.gz
-    echo "- Unpacking pbl"
-    tar xf pbl_1_04.tar.gz
-    mv pbl_1_04_04 pbl
-fi
+if [ "$#" -lt 1 -o "$1" = "daemon" ]; then
+    if [ ! -d pbl ]; then
+        echo "- Fetching pbl"
+        wget -q http://www.mission-base.com/peter/source/pbl_1_04.tar.gz
+        echo "- Unpacking pbl"
+        tar xf pbl_1_04.tar.gz
+        mv pbl_1_04_04 pbl
+    fi
 
-echo "- Building PBL"
-cd pbl/src
-make
-cd ../..
+    echo "- Building PBL"
+    cd pbl/src
+    make
+    cd ../..
+fi
 
 rm build/*.o &> /dev/null || true
 
