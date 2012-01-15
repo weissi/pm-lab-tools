@@ -85,11 +85,15 @@ void *pm_connect(char *server,
                      num_channels*sizeof(uint32_t));
 
     err = full_read(sockfd, welcome_msg, sizeof(WELCOME_MSG));
-    assert(sizeof(WELCOME_MSG) == err);
+    if(sizeof(WELCOME_MSG) != err) {
+        return NULL;
+    }
     assert(0 == strncmp(WELCOME_MSG, welcome_msg, sizeof(WELCOME_MSG)));
 
     err = full_read(sockfd, (char *)&net_sampling_rate, sizeof(uint32_t));
-    assert(sizeof(uint32_t) == err);
+    if(sizeof(uint32_t) != err) {
+        return NULL;
+    }
 
     /* Only create structure once connection is established */
     handle = (pm_handle *)malloc(sizeof(pm_handle));
