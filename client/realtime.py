@@ -47,7 +47,7 @@ if len(sys.argv) != 2 and len(sys.argv) != 3 and len(sys.argv) != 5:
             "<resistance mOhm>]]" % (sys.argv[0])
     print "Colors:"
     for name,num in zip(color_names, xrange(1, len(colors)+1)):
-        print "\tcolumn %d: %s" % (num, name)
+        print "\tchannel %d: %s" % (num, name)
     sys.exit(1)
 
 time_resolution = float(sys.argv[1])
