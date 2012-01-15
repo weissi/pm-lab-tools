@@ -46,8 +46,6 @@ void *pm_connect(char *server,
     err = getaddrinfo(server, port, &hints, &result);
     if(0 != err) {
         return NULL;
-        //fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(err));
-        //exit(EXIT_FAILURE);
     }
 
     for(rp = result; rp != NULL; rp = rp->ai_next) {
@@ -65,8 +63,6 @@ void *pm_connect(char *server,
 
     if(NULL == rp) {
         return NULL;
-        //fprintf(stderr, "Could not connect\n");
-        //exit(EXIT_FAILURE);
     }
 
     freeaddrinfo(result);
