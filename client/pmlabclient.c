@@ -11,7 +11,6 @@
 /* buffers, have to be large enough to read from the network */
 #define BUFFER_SIZES  (8 * 50000)
 static double analog_data[BUFFER_SIZES] = { 0 };
-static digival_t digital_data[BUFFER_SIZES] = { 0 };
 
 static bool running = true;
 
@@ -67,7 +66,7 @@ int main(int argc, char *argv[])
         int err = pm_read(pm_handle,
                           BUFFER_SIZES,
                           analog_data,
-                          digital_data,
+                          NULL,
                           &sample_count,
                           &timestamp);
         if (0 == err) {

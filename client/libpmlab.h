@@ -37,7 +37,7 @@ uint32_t pm_samplingrate(void *handle);
  * handle: The server handle
  * buffer_sizes: The sizes of the buffers analog_data and digital_data
  * analog_data: A buffer for the analog data
- * digital_data: A buffer for the digital data
+ * unused: unused (set to NULL)
  * samples_read: A pointer to an integer where the number of samples
  *               read will be written to
  * timestamp_nanons: A pointer to an uint64_t where the timestamp of the first
@@ -51,7 +51,7 @@ uint32_t pm_samplingrate(void *handle);
 int pm_read(void *handle,
             size_t buffer_sizes,
             double *analog_data,
-            digival_t *digital_data,
+            digival_t *unused,
             unsigned int *samples_read,
             uint64_t *timestamp_nanos);
 
