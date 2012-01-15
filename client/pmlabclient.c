@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include <inttypes.h>
+#include <stdbool.h>
+#include <signal.h>
 
 #include "libpmlab.h"
 #include "common/conf.h"
@@ -10,6 +12,13 @@
 #define BUFFER_SIZES  (8 * 50000)
 static double analog_data[BUFFER_SIZES] = { 0 };
 static digival_t digital_data[BUFFER_SIZES] = { 0 };
+
+static bool running = true;
+
+static void sig_hnd() {
+    fprintf(stderr, "Ctrl+C caught, exiting...\n");
+    running = false;
+}
 
 int main(int argc, char *argv[])
 {
@@ -39,6 +48,8 @@ int main(int argc, char *argv[])
     server = argv[1];
     port = argv[2];
 
+    signal(SIGINT, (void (*)(int))sig_hnd);
+
     /* connect to server */
     pm_handle = pm_connect(server, port, channels, num_channels);
     if (NULL == pm_handle) {
@@ -50,7 +61,7 @@ int main(int argc, char *argv[])
     sampling_rate = pm_samplingrate(pm_handle);
 
     /* read forever */
-    while (1) {
+    while (running) {
         int i, j;
         /* read data from network */
         int err = pm_read(pm_handle,
