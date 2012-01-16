@@ -4,3 +4,10 @@ gmon.out
 .deps/lib
 .deps/include
 .deps/bin
+doc/slides/pm-lab-tools-slides.aux
+doc/slides/pm-lab-tools-slides.log
+doc/slides/pm-lab-tools-slides.nav
+doc/slides/pm-lab-tools-slides.out
+doc/slides/pm-lab-tools-slides.snm
+doc/slides/pm-lab-tools-slides.toc
+doc/slides/pm-lab-tools-slides.vrb
