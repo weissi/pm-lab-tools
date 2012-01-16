@@ -297,8 +297,9 @@ void *handler_thread_main(void *opaque_info) {
     uint32_t net_sampling_rate;
     uint32_t *net_channels;
     uint32_t *channels;
-    pthread_t sender_thread;
+    pthread_t sender_thread = 0;
     volatile bool handler_running = true;
+    bool handler_registered_alive = false;
     buffer_desc_t buffer_desc = { .buffer =malloc(BUF_SIZE*sizeof(input_data_t))
                                 , .lock = PTHREAD_MUTEX_INITIALIZER
                                 , .cond = PTHREAD_COND_INITIALIZER
@@ -311,10 +312,23 @@ void *handler_thread_main(void *opaque_info) {
     buffer_desc.start = buffer_desc.buffer;
 
     /* read channel information */
-    err = read(info->fd, &net_nc, sizeof(uint32_t));
-    assert(sizeof(net_nc) == err);
+    err = full_read(info->fd, (char*)&net_nc, sizeof(uint32_t));
+    if(sizeof(net_nc) != err) {
+        /* error while reading */
+        printf("[%lu] error while reading: %s\n",
+               (unsigned long int)pthread_self(),
+               strerror(errno));
+        goto finally;
+    }
+
     num_channels = ntohl(net_nc);
-    assert(num_channels <= MAX_CHANNELS);
+    if(num_channels > MAX_CHANNELS) {
+        /* not allowed: too many channels */
+        printf("[%lu] too many channels: %u\n",
+               (unsigned long int)pthread_self(),
+               num_channels);
+        goto finally;
+    }
 
     net_channels = alloca(sizeof(uint32_t)*num_channels);
     channels = alloca(sizeof(uint32_t)*num_channels);
@@ -322,11 +336,23 @@ void *handler_thread_main(void *opaque_info) {
     err = full_read(info->fd,
                     (char *)net_channels,
                     sizeof(uint32_t)*num_channels);
-    assert(sizeof(uint32_t)*num_channels == err);
+    if(sizeof(uint32_t)*num_channels != err) {
+        /* error while reading */
+        printf("[%lu] error while reading: %s\n",
+               (unsigned long int)pthread_self(),
+               strerror(errno));
+        goto finally;
+    }
 
     for(i = 0; i < num_channels; i++) {
         channels[i] = ntohl(net_channels[i]);
-        assert(channels[i] < info->data_info->num_channels);
+        if(channels[i] >= info->data_info->num_channels) {
+            /* not allowed: wrong channel number */
+            printf("[%lu] wrong channel number: %u\n",
+                   (unsigned long int)pthread_self(),
+                   channels[i]);
+            goto finally;
+        }
     }
 
     sender_info.buffer_desc = &buffer_desc;
@@ -341,8 +367,10 @@ void *handler_thread_main(void *opaque_info) {
                          &sender_info);
     assert(0 == err);
 
-    printf("Handler thread accepted %d\n", info->fd);
     inc_available_handlers();
+    handler_registered_alive = true;
+    printf("Handler thread accepted %d\n", info->fd);
+
     err = full_write(info->fd, WELCOME_MSG, sizeof(WELCOME_MSG));
     assert(sizeof(WELCOME_MSG) == err);
 
@@ -371,27 +399,26 @@ void *handler_thread_main(void *opaque_info) {
                (buffer_desc.start-buffer_desc.buffer));
 
         set_ready();
-
-        /*
-#ifndef __MACH__
-        err = pthread_tryjoin_np(sender_thread, NULL);
-        if(EBUSY != err) {
-            break;
-        }
-#endif
-*/
     }
-    dec_available_handlers();
+
+finally:
+    if(handler_registered_alive) {
+        dec_available_handlers();
+    }
     handler_running = false;
+
     err = close(info->fd);
     assert(0 == err);
 
-    err = pthread_join(sender_thread, NULL);
-    if(EINVAL != err) {
-        assert(0 == err);
+    if(0 != sender_thread) {
+        err = pthread_join(sender_thread, NULL);
+        if(EINVAL != err) {
+            assert(0 == err);
+        }
     }
-    free_buffer(&buffer_desc);
 
+    free_buffer(&buffer_desc);
     free(opaque_info);
+
     return NULL;
 }
