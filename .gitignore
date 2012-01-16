@@ -1,2 +1,6 @@
 gmon.out
-.deps
+.deps/pbl*
+.deps/protobuf*
+.deps/lib
+.deps/include
+.deps/bin
