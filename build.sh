@@ -95,6 +95,7 @@ function install_protobuf() {
 }
 
 ld $LDFLAGS -lprotobuf -lprotobuf-c &> /dev/null || install_protobuf
+rm a.out || true
 
 echo "- Generating protos"
 if which protoc-c > /dev/null; then
