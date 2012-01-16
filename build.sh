@@ -20,6 +20,8 @@ export CFLAGS="$CFLAGS $NI_CFLAGS -I$HERE -ggdb -I$(pwd)/.deps/pbl/src"\
 "    -I$(pwd)/.deps/include"
 export LDFLAGS="$LDFLAGS -L$(pwd)/.deps/lib -ggdb"
 export CXXFLAGS="$CFLAGS"
+export PATH="$PATH:$HERE/.deps/bin"
+
 LLPA="$(pwd)/.deps/lib"
 if [ -z "$LD_LIBRARY_PATH" ]; then
     export LD_LIBRARY_PATH="$LLPA"
@@ -30,8 +32,6 @@ fi
 if [ "$(uname -s)" != "Darwin" ]; then
     LDFLAGS="$LDFLAGS -lrt"
 fi
-
-export PATH="$PATH:$HERE/.deps/bin"
 
 function compile_c() {
     echo "- Compiling $1.c"
