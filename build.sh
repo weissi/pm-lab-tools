@@ -31,6 +31,8 @@ if [ "$(uname -s)" != "Darwin" ]; then
     LDFLAGS="$LDFLAGS -lrt"
 fi
 
+export PATH="$PATH:$HERE/.deps/bin"
+
 function compile_c() {
     echo "- Compiling $1.c"
     ALDF="-lpthread"
@@ -46,7 +48,7 @@ function install_pbl() {
     cd .deps
     if [ ! -d pbl ]; then
         echo "- Fetching pbl"
-        wget -q http://www.mission-base.com/peter/source/pbl_1_04.tar.gz
+        curl http://www.mission-base.com/peter/source/pbl_1_04.tar.gz
         echo "- Unpacking pbl"
         tar xf pbl_1_04.tar.gz
         mv pbl_1_04_04 pbl
@@ -62,7 +64,7 @@ function install_protobuf() {
   cd .deps
   if [ ! -d protobuf-src ]; then
       echo "- Fetching protobuf"
-      wget -q -O protobuf.tar.bz2 'http://protobuf.googlecode.com/files/protobuf-2.4.1.tar.bz2'
+      curl -o protobuf.tar.bz2 'http://protobuf.googlecode.com/files/protobuf-2.4.1.tar.bz2'
       echo "- Unpacking protobuf"
       tar xjf protobuf.tar.bz2
       mv protobuf-2.4.1 protobuf-src
@@ -70,7 +72,7 @@ function install_protobuf() {
 
   if [ ! -d protobuf-c-src ]; then
       echo "- Fetching protobuf-c"
-      wget -q -O protobuf-c.tar.bz2 'http://protobuf-c.googlecode.com/files/protobuf-c-0.15.tar.gz'
+      curl -o protobuf-c.tar.bz2 'http://protobuf-c.googlecode.com/files/protobuf-c-0.15.tar.gz'
       echo "- Unpacking protobuf-c"
       tar xzf protobuf-c.tar.bz2
       mv protobuf-c-0.15 protobuf-c-src
@@ -131,7 +133,6 @@ if [ "$#" -lt 1 -o "$1" = "client" ]; then
     gcc $LDFLAGS -lprotobuf-c -o build/pmlabclient build/*.o
 fi
 
-
 if [ "$#" -lt 1 -o "$1" = "daemon" ]; then
     install_pbl
 
@@ -155,6 +156,7 @@ if [ "$#" -lt 1 -o "$1" = "daemon" ]; then
     gcc $LDFLAGS $NI_LDFLAGS -lprotobuf-c -lpthread -o build/daemon \
         build/*.o .deps/pbl/src/libpbl.a
 fi
+
 
 CMD="export LD_LIBRARY_PATH=\"$LD_LIBRARY_PATH\""
 if ! grep -q LD_LIBRARY_PATH ~/.bashrc; then
