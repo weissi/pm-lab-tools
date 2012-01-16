@@ -94,14 +94,20 @@ function install_protobuf() {
   cd ../..
 }
 
+ld $LDFLAGS -lprotobuf -lprotobuf-c &> /dev/null || install_protobuf
+
 echo "- Generating protos"
+if which protoc-c > /dev/null; then
+    PROTOC="protoc-c"
+else
+    PROTOC=".deps/bin/protoc-c"
+fi
+
 cd protos &> /dev/null
 for f in *.proto; do
-    protoc-c --c_out=../gensrc "$f"
+    $PROTOC --c_out=../gensrc "$f"
 done
 cd ..
-
-ld $LDFLAGS -lprotobuf -lprotobuf-c &> /dev/null || install_protobuf
 
 if [ "$#" -lt 1 -o "$1" = "client" ]; then
     rm build/*.o &> /dev/null || true
