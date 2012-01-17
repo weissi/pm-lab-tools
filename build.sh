@@ -8,11 +8,11 @@ cd "$HERE"
 rm build/*.o &> /dev/null || true
 
 if [ "$1" = "-n" ]; then
-    NI_CFLAGS=""
+    NI_CFLAGS="-DSAMPLING_RATE=30000"
     NI_LDFLAGS=""
     shift
 else
-    NI_CFLAGS="-DWITH_NI"
+    NI_CFLAGS="-DWITH_NI -DSAMPLING_RATE=NI_SAMPLING_RATE"
     NI_LDFLAGS="-lnidaqmxbase"
 fi
 
