@@ -157,6 +157,8 @@ int read_dummy(void *handle, unsigned int sampling_rate,
 #ifndef __MACH__
     t_next.tv_sec += 1;
     clock_nanosleep(CLOCK_REALTIME, TIMER_ABSTIME, &t_next, NULL);
+#else
+    sleep(1);
 #endif
 
     return 0;
