@@ -1,3 +1,23 @@
+/*
+ *  Records analog data from a NI USB-6218 and send it to connected clients
+ *
+ *  Copyright (C)2011-2012, Johannes Weiß <weiss@tux4u.de>
+ *                        , Jonathan Dimond <jonny@dimond.de>
+ *
+ *  This program is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 static const double TEST_ANALOG_DATA[240000] = {
     -0.002897, -0.002172, 0.004638, -0.002238, -0.001408, 0.005593, -0.001817, -0.001599, 
     0.007733, -0.001764, 0.000436, 0.002339, -0.003707, 0.001325, 0.005145, -0.003213, 
@@ -30000,3 +30020,4 @@ static const double TEST_ANALOG_DATA[240000] = {
     0.001174, 0.001490, -0.004985, 0.001674, 0.001365, -0.004590, -0.002745, 0.000607, 
     -0.004471, 0.002352, 0.000765, -0.003997, 0.002616, 0.000699, -0.003457, -0.000513
 };
+/* vim: set fileencoding=utf8 : */
