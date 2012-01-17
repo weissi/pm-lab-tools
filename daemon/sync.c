@@ -43,7 +43,7 @@ static PblSet *__dead_handler_set = NULL; /* all handlers that are dead
  */
 
 static int pthread_hash(const void *element) {
-    return (int)*(pthread_t *)element;
+    return *(int *)element;
 }
 
 static int pthread_compare(const void *prev, const void *next) {
