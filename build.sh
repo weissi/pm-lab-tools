@@ -20,7 +20,7 @@ export CFLAGS="$CFLAGS $NI_CFLAGS -I$HERE -ggdb -I$(pwd)/.deps/pbl/src"\
 "    -I$(pwd)/.deps/include"
 export LDFLAGS="$LDFLAGS -L$(pwd)/.deps/lib -ggdb"
 export CXXFLAGS="$CFLAGS"
-export PATH="$PATH:$HERE/.deps/bin"
+export PATH="$HERE/.deps/bin:$PATH"
 
 LLPA="$(pwd)/.deps/lib"
 if [ -z "$LD_LIBRARY_PATH" ]; then
@@ -48,9 +48,10 @@ function install_pbl() {
     cd .deps
     if [ ! -d pbl ]; then
         echo "- Fetching pbl"
-        curl http://www.mission-base.com/peter/source/pbl_1_04.tar.gz
+        curl -o pbl_1_04.tar.gz \
+            http://www.mission-base.com/peter/source/pbl_1_04.tar.gz
         echo "- Unpacking pbl"
-        tar xf pbl_1_04.tar.gz
+        tar xzf pbl_1_04.tar.gz
         mv pbl_1_04_04 pbl
     fi
 
@@ -96,8 +97,9 @@ function install_protobuf() {
   cd ../..
 }
 
-ld $LDFLAGS -lprotobuf -lprotobuf-c &> /dev/null || install_protobuf
-rm a.out || true
+echo 'int main(){return 0;}' > /tmp/test_lib.c
+gcc $LDFLAGS -lprotobuf -lprotobuf-c -o /tmp/test_lib \
+    /tmp/test_lib.c &> /dev/null || true #install_protobuf
 
 echo "- Generating protos"
 if which protoc-c > /dev/null; then
@@ -128,7 +130,7 @@ if [ "$#" -lt 1 -o "$1" = "client" ]; then
     done
     echo "- Linking pmlabclient"
     if [ -f build/libpmlab ]; then
-        rm build/libpmlab
+        rm build/libpmlab &> /dev/null || true
     fi
     gcc $LDFLAGS -lprotobuf-c -o build/pmlabclient build/*.o
 fi
@@ -151,7 +153,7 @@ if [ "$#" -lt 1 -o "$1" = "daemon" ]; then
     compile_c daemon/daemon
     echo "- Linking deamon"
     if [ -f build/daemon ]; then
-        rm build/daemon
+        rm build/daemon &> /dev/null || true
     fi
     gcc $LDFLAGS $NI_LDFLAGS -lprotobuf-c -lpthread -o build/daemon \
         build/*.o .deps/pbl/src/libpbl.a
