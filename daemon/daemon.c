@@ -1,8 +1,8 @@
 /*
  *  Records analog data from a NI USB-6218 and send it to connected clients
  *
- *  Copyright (C)2011, Johannes Weiß <weiss@tux4u.de>
- *                   , Jonathan Dimond <jonny@dimond.de>
+ *  Copyright (C)2011-2012, Johannes Weiß <weiss@tux4u.de>
+ *                        , Jonathan Dimond <jonny@dimond.de>
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -157,6 +157,8 @@ int read_dummy(void *handle, unsigned int sampling_rate,
 #ifndef __MACH__
     t_next.tv_sec += 1;
     clock_nanosleep(CLOCK_REALTIME, TIMER_ABSTIME, &t_next, NULL);
+#else
+    sleep(1);
 #endif
 
     return 0;
@@ -359,6 +361,18 @@ int main(int argc, char **argv) {
 
     signal(SIGINT, (void (*)(int))sig_hnd);
     signal(SIGPIPE, SIG_IGN);
+
+    fprintf(stderr,
+            "pm-lab-tools/daemon, Copyright (C)2011-2012, "
+            "Johannes Weiß <uni@tux4u.de>\n");
+    fprintf(stderr,
+            "                                           & "
+            "Jonathan Dimond <jonny@dimond.de>\n");
+    fprintf(stderr,
+            "This program comes with ABSOLUTELY NO WARRANTY; "
+            "for details type `show w'.\n"
+            "This is free software, and you are welcome to redistribute it"
+            "\nunder certain conditions; type `show c' for details.\n\n");
 
     init_sync();
 
