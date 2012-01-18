@@ -48,7 +48,23 @@ static unsigned int parse_channels(unsigned int argc,
     unsigned int active_channels = 0;
 
     for(unsigned int i=0; i<argc && active_channels <= max_channels; i++) {
-        if(0 == strcmp("pm2", argv[i])) {
+        if(0 ==strcmp("ai0", argv[i])) {
+            chosen_channels[active_channels++] = AI0;
+        } else if(0 == strcmp("ai1", argv[i])) {
+            chosen_channels[active_channels++] = AI1;
+        } else if(0 == strcmp("ai2", argv[i])) {
+            chosen_channels[active_channels++] = AI2;
+        } else if(0 == strcmp("ai3", argv[i])) {
+            chosen_channels[active_channels++] = AI3;
+        } else if(0 == strcmp("ai4", argv[i])) {
+            chosen_channels[active_channels++] = AI4;
+        } else if(0 == strcmp("ai5", argv[i])) {
+            chosen_channels[active_channels++] = AI5;
+        } else if(0 == strcmp("ai6", argv[i])) {
+            chosen_channels[active_channels++] = AI6;
+        } else if(0 == strcmp("ai7", argv[i])) {
+            chosen_channels[active_channels++] = AI7;
+        } else if(0 == strcmp("pm2", argv[i])) {
             chosen_channels[active_channels++] = PM2_DD;
         } else if(0 == strcmp("pm3", argv[i])) {
             chosen_channels[active_channels++] = PM3_DD;
@@ -78,12 +94,14 @@ static unsigned int parse_channels(unsigned int argc,
 int main(int argc, char **argv)
 {
     uint32_t all_channels[] = {
-        PM2_DD,
-        PM3_DD,
-        PM4_DD,
-        PM5_CPU,
-        PM6_CPU,
-        PM7_CPU,
+        AI0,
+        AI1,
+        AI2,
+        AI3,
+        AI4,
+        AI5,
+        AI6,
+        AI7
     };
     /* channels to listen to */
     uint32_t chosen_channels[8] = { 0 };

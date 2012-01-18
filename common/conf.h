@@ -21,15 +21,23 @@
 #ifndef CONF_H
 #define CONF_H
 
+#define PM2_DD  (AI1)
+#define PM3_DD  (AI2)
+#define PM4_DD  (AI3)
+#define PM5_CPU (AI4)
+#define PM6_CPU (AI5)
+#define PM7_CPU (AI6)
+
+/* DO NOT CHANGE THE VALUES BELOW! */
 enum channel_ids {
-    PM7_CPU = 0,
-    PM2_DD  = 1,
-    PM3_DD  = 2,
-    PM4_DD  = 3,
-    PM5_CPU = 4,
-    PM6_CPU = 5,
-    CHAN7   = 6,
-    CHAN8   = 7
+    AI0 = 0,
+    AI1 = 1,
+    AI2 = 2,
+    AI3 = 3,
+    AI4 = 4,
+    AI5 = 5,
+    AI6 = 6,
+    AI7 = 7
 };
 
 #define NI_CHANNELS "Dev1/ai0, Dev1/ai1, Dev1/ai2, Dev1/ai3," \
