@@ -19,7 +19,7 @@
 
 #include "measured-data.pb-c.h"
 
-#define BUF_SIZE 256
+#define BUF_SIZE 8
 #define MAX_CHANNELS 8
 
 typedef struct {
