@@ -99,7 +99,7 @@ function install_protobuf() {
 
 echo 'int main(){return 0;}' > /tmp/test_lib.c
 gcc $LDFLAGS -lprotobuf -lprotobuf-c -o /tmp/test_lib \
-    /tmp/test_lib.c &> /dev/null || true #install_protobuf
+    /tmp/test_lib.c &> /dev/null || install_protobuf
 
 echo "- Generating protos"
 if which protoc-c > /dev/null; then
