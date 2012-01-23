@@ -97,9 +97,12 @@ function install_protobuf() {
   cd ../..
 }
 
-echo 'int main(){return 0;}' > /tmp/test_lib.c
-gcc $LDFLAGS -lprotobuf -lprotobuf-c -o /tmp/test_lib \
-    /tmp/test_lib.c &> /dev/null || install_protobuf
+TEST_BINARY=$(mktemp /tmp/test_lib_XXXXXX)
+TEST_C_FILE="${TEST_BINARY}.c"
+echo 'int main(){return 0;}' > "$TEST_C_FILE"
+gcc $LDFLAGS -lprotobuf -lprotobuf-c -o "$TEST_BINARY" \
+    "$TEST_C_FILE" &> /dev/null || install_protobuf
+rm "$TEST_BINARY" "$TEST_C_FILE"
 
 echo "- Generating protos"
 if which protoc-c > /dev/null; then
