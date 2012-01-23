@@ -93,6 +93,8 @@ num_horizontal_ticks = 4
 horizontal_ticks = []
 font = pygame.font.Font(None, 17)
 
+mouse_pos = (0, 0)
+
 while 1:
     averages.append(average_interval(time_per_sample))
     averages = averages[-window_width:]
@@ -111,6 +113,7 @@ while 1:
         avg_min = avg_min*0.999
     for event in pygame.event.get():
         if event.type == pygame.QUIT: sys.exit()
+        elif event.type == pygame.MOUSEMOTION: mouse_pos = event.pos
     screen.fill(white)
     y1s = map(lambda x: height - int((x-avg_min)/(avg_max-avg_min)*height_used) - height_offset, averages[0])
     for i in range(1, len(averages)):
@@ -129,6 +132,13 @@ while 1:
     screen.blit(text, text_rect)
     text = font.render("%f" % avg_min, True, black)
     text_rect = text.get_rect(right=width-7,centery=height-height_offset)
+    screen.blit(text, text_rect)
+    #mouse values
+    (x, y) = mouse_pos
+    my = (1.0-1.0*(y-height_offset)/height_used)*(avg_max-avg_min)+avg_min
+    mx = (1.0*x/width)*(window_width*time_per_sample)+lasttime-(len(averages)*time_per_sample)
+    text = font.render("(x=%f, y=%f)" % (mx, my), True, black)
+    text_rect = text.get_rect(left=0, top=0)
     screen.blit(text, text_rect)
     for pos, val in horizontal_ticks:
         pygame.draw.line(screen, black, (quality*pos, height), (quality*pos, height-5))
