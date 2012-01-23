@@ -1,0 +1,46 @@
+#!/bin/bash
+
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null && pwd)
+cd "$HERE"
+
+function usage() {
+    echo >&2 "Usage: $0 TEAM"
+    echo >&2
+    echo >&2 "TEAM in PM{2,3,4,5,6,7}"
+}
+
+TEAM=$(echo "$1" | tr A-Z a-z)
+
+case "$TEAM" in
+    pm2)
+        VOLTAGE=5
+        RESISTOR=50
+        ;;
+    pm3)
+        VOLTAGE=5
+        RESISTOR=50
+        ;;
+    pm4)
+        VOLTAGE=5
+        RESISTOR=50
+        ;;
+    pm5)
+        VOLTAGE=12
+        RESISTOR=10
+        ;;
+    pm6)
+        VOLTAGE=12
+        RESISTOR=10
+        ;;
+    pm7)
+        VOLTAGE=12
+        RESISTOR=10
+        ;;
+    *)
+        usage
+        exit 1
+        ;;
+esac
+
+build/pmlabclient i30pm1 12345 "$TEAM" | \
+    client/realtime.py 40 1 "$VOLTAGE" "$RESISTOR"
