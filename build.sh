@@ -102,7 +102,7 @@ TEST_C_FILE="${TEST_BINARY}.c"
 echo 'int main(){return 0;}' > "$TEST_C_FILE"
 gcc $LDFLAGS -lprotobuf -lprotobuf-c -o "$TEST_BINARY" \
     "$TEST_C_FILE" &> /dev/null || install_protobuf
-rm "$TEST_BINARY" "$TEST_C_FILE"
+rm "$TEST_BINARY" "$TEST_C_FILE" || true
 
 echo "- Generating protos"
 if which protoc-c > /dev/null; then
