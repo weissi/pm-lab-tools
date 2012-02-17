@@ -5,6 +5,8 @@ Authors:
   Johannes Weiß <uni@tux4u.de>
   Jonathan Dimond <jonny@dimond.de>
 
+Current status of the repository: STABLE, works good :-) 
+
 Developed for the PowerManagement Lab at the KIT (Karlsruhe Institute of
 Technology [1]). More information about the PM Lab at [2]. Main repository at
 
@@ -14,7 +16,7 @@ https://github.com/weissi/pm-lab-tools
 Functionality
 -------------
 
-Reads data from a connected measuring device (currently only NI USB USB-6218 [3]
+Reads data from a connected measuring device (currently only NI USB-6218 [3]
 implemented) and sends the data to connected clients via TCP/IP. The wire format
 is implemented using Google Protocol Buffers [4].
 
